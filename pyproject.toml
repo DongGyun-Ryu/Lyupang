@@ -1,0 +1,9 @@
+[project]
+name = "lyupang"
+version = "0.1.0"
+description = "키움증권의 국내 주식 일별 가격·거래량 수집기"
+requires-python = ">=3.13,<3.14"
+dependencies = ["kwcli==1.0.3"]
+
+[tool.uv]
+package = false
