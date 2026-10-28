@@ -26,6 +26,8 @@ details{margin:18px 0}pre{white-space:pre-wrap;font:inherit;background:#f4f4f4;p
 </details>
 <p class="note">처음에는 몇 문장만 해도 됩니다. 답한 내용은 이 브라우저에 임시 보관을 시도하지만, 확실히 보관하려면 아래의 <b>답안 파일 저장</b>을 누르세요. 인터넷으로 답을 전송하지 않습니다.</p>
 <p id="progress" aria-live="polite"></p>
+<label for="jump">확인할 문장 바로가기</label><select id="jump"></select>
+<p class="small">문장 첫 부분을 보고 골라주세요. 같은 문장에서 선택을 바꾸면 기존 답이 수정됩니다. 다른 문장에 답하면 답변 수가 늘어납니다.</p>
 <div class="bar"><button id="prev" type="button">이전 문장</button><span id="number"></span><button id="next" type="button">다음 문장</button></div>
 <section aria-labelledby="title"><h2 id="title"></h2><p id="path" class="small"></p><blockquote id="quote"></blockquote>
 <details id="surrounding"><summary>앞뒤 문단 보기</summary><pre id="context"></pre><p class="small">강조된 문장만 판단합니다. 긴 문단의 앞뒤는 일부만 표시할 수 있습니다.</p></details>
@@ -47,7 +49,7 @@ details{margin:18px 0}pre{white-space:pre-wrap;font:inherit;background:#f4f4f4;p
 const data=JSON.parse(document.getElementById('review-data').textContent);
 const $=id=>document.getElementById(id);
 const allowed={subject:['company','industry','mixed','unclear'],time:['reported','outlook','mixed','unclear']};
-const key='Lyupang:text-review:'+data.pack_hash;
+const key='Lyupang:text-review:'+data.pack_hash+(data.seed_hash?':view:'+data.seed_hash:'');
 let index=0, answers=Object.create(null);
 const notice=message=>{$('save-status').textContent=message;};
 function validRecords(file){
@@ -75,6 +77,7 @@ function updateProgress(){
 function render(){
   const item=data.items[index], row=answers[item.id];
   $('number').textContent=`${index+1} / ${data.items.length}`;
+  $('jump').value=String(index);
   $('title').textContent=`${item.company_name} · 확인할 문장`;
   $('path').textContent=item.headings.join(' / ');
   $('quote').textContent=item.text;
@@ -105,6 +108,10 @@ $('note').addEventListener('input',capture);
 $('attest').addEventListener('change',updateProgress);
 $('prev').addEventListener('click',()=>{index--;render();});
 $('next').addEventListener('click',()=>{index++;render();});
+$('jump').addEventListener('change',()=>{index=Number($('jump').value);render();});
+for(const [i,item] of data.items.entries()){
+  const option=document.createElement('option');option.value=String(i);option.textContent=`${i+1}. ${item.company_name} · ${item.text.slice(0,70)}`;$('jump').append(option);
+}
 $('save').addEventListener('click',()=>{
   if($('save').disabled)return;
   const blob=new Blob([JSON.stringify(fileData(),null,2)],{type:'application/json;charset=utf-8'}), url=URL.createObjectURL(blob);
@@ -116,7 +123,9 @@ $('restore').addEventListener('change',async()=>{
   catch{notice('같은 검토 묶음에서 저장한 올바른 답안 파일인지 확인해주세요.');}
   $('restore').value='';
 });
+if(data.saved_answers){answers=validRecords(data.saved_answers);notice('저장한 기존 답안을 불러왔습니다. 고칠 문장의 선택만 바꾸고 다시 저장하세요.');}
 try{const saved=localStorage.getItem(key);if(saved){const parsed=JSON.parse(saved);if(parsed.answers?.length)answers=validRecords(parsed);}}catch{notice('임시 보관을 읽지 못했습니다. 저장한 답안 파일을 불러올 수 있습니다.');}
+try{const requested=decodeURIComponent(location.hash.slice(1)), selected=data.items.findIndex(item=>item.id===requested);if(selected>=0)index=selected;}catch{}
 render();
 </script>
 </html>

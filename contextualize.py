@@ -84,7 +84,7 @@ def render_report(summary, statements, outcomes):
                     "quality_issue": "가격 품질 확인", "source_error": "가격 파일 확인"}
     subject_names = {"company": "회사", "industry": "산업", "mixed": "혼합", "unclear": "판단 보류"}
     time_names = {"reported": "과거·현재 보고 표현", "outlook": "전망·계획", "mixed": "혼합", "unclear": "판단 보류"}
-    term_names = {"accounting_term": "회계 용어", "management_term": "관리·제도 용어"}
+    term_names = {"accounting_term": "회계 용어", "management_term": "관리·제도 용어", "organization_term": "조직·체계 용어"}
     table, sections = [], []
     for stock in summary["stocks"]:
         stats = stock["counts"]
@@ -123,6 +123,8 @@ def render_report(summary, statements, outcomes):
                     reasons = " / ".join(cue_texts[:10]) or "명확한 표현 부족"
                     if classification["company_heading_fallback"]:
                         reasons += " / 회사 실적 제목 문맥"
+                    if classification.get("financial_heading_fallback"):
+                        reasons += " / 경영진단·재무 제목과 당기·전기 인식액 문맥"
                     excluded = " / ".join(sorted({f"{m['context_text']} ({term_names[m['reason']]})"
                                                      for m in classification["excluded_expressions"]}))
                     caution = (f"<br>전망 근거에서 제외: {esc(excluded)}. 다른 전망 표현은 별도로 확인하며 이 문장은 판단을 보류합니다."

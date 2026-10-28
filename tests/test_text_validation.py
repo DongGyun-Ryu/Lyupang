@@ -38,7 +38,7 @@ class AgreementTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.pack = self.root / "pack"
         self.pack.mkdir()
-        self.items = [{"id": str(i), "company_name": "테스트 회사", "text": f"기능 검사용 문장 {i}",
+        self.items = [{"id": str(i), "company_name": "테스트 회사", "headings": [], "text": f"기능 검사용 문장 {i}",
                        "text_sha256": tv.digest(f"기능 검사용 문장 {i}".encode())} for i in range(4)]
         axes = [("company", "reported"), ("industry", "outlook"), ("mixed", "mixed"), ("company", "outlook")]
         predictions = [{"id": item["id"], "text_sha256": item["text_sha256"], "subject": axis[0],
@@ -82,6 +82,32 @@ class AgreementTests(unittest.TestCase):
         summary, _ = tv.evaluate(self.pack, self.labels)
         self.assertEqual(summary["answered"], 0)
         self.assertTrue(all(group["joint_agreement_pct"] is None for group in summary["groups"]))
+
+    def test_old_v2_pack_scores_stay_frozen_with_separate_development_recheck_and_edit_links(self):
+        self.write_answers([answer(self.items[0]), answer(self.items[1], subject="mixed", orientation="mixed")])
+        before, _ = tv.evaluate(self.pack, self.labels)
+        protected = {p: p.read_bytes() for p in self.pack.iterdir()}
+        result, summary = textcheck.record_evaluation(self.pack, self.labels, self.root)
+        self.assertEqual(summary["groups"], before["groups"])
+        self.assertEqual(summary["development_recheck_policy"], "sentence_context_rules_v3")
+        self.assertFalse(summary["development_recheck_is_validation"])
+        self.assertEqual(protected, {p: p.read_bytes() for p in protected})
+        page = (result / "report.html").read_text()
+        self.assertIn("review.html#1", page)
+        self.assertIn("이 문장의 답 수정하기", page)
+        self.assertIn("보완 규칙으로 다시 읽은 답 (개발용)", page)
+        edit = (result / "review.html").read_text()
+        embedded = json.loads(re.search(r'<script id="review-data" type="application/json">(.*?)</script>', edit, re.S)[1])
+        self.assertEqual(embedded["saved_answers"]["answers"], tv.read_json(self.labels)["answers"])
+        self.assertNotIn("development_recheck", json.dumps(embedded))
+        self.assertNotIn("predictions", embedded)
+        extra = tv.read_json(self.labels)
+        extra["predictions"] = ["not user-entered answers"]
+        extra["answers"][0]["classification"] = "not a reviewer field"
+        clean_editor = tv.review_html(tv.load_pack(self.pack)[0], self.items, extra)
+        clean_data = json.loads(re.search(r'<script id="review-data" type="application/json">(.*?)</script>', clean_editor, re.S)[1])
+        self.assertNotIn("predictions", json.dumps(clean_data))
+        self.assertNotIn("classification", json.dumps(clean_data))
 
     def test_wrong_pack_duplicate_unknown_labels_and_missing_attestation_are_rejected(self):
         baseline = self.write_answers([answer(self.items[0])])

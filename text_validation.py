@@ -11,6 +11,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from lyupang import CollectionError, SEOUL
 
@@ -20,6 +21,7 @@ SUBJECT_NAMES = dict(zip(SUBJECTS, ("회사", "산업 전체", "둘 다", "주�
 TIME_NAMES = dict(zip(TIMES, ("과거·현재의 상태나 활동", "미래 전망·계획", "둘 다", "시점 불명확")))
 GROUP_NAMES = {"general": "일반 추출", "challenge": "오류 점검 추출"}
 RUBRIC = "text_subject_time_v1"
+SUPPORTED_POLICIES = {"sentence_context_rules_v2", "sentence_context_rules_v3"}
 MAX_BYTES = 64 * 1024 * 1024
 
 
@@ -66,7 +68,7 @@ def latest_context(root):
 def source_rows(source):
     summary = read_json(source / "summary.json")
     if (summary.get("schema_version") != 1 or summary.get("status") != "linked"
-            or summary.get("classification_policy") != "sentence_context_rules_v2"):
+            or summary.get("classification_policy") not in SUPPORTED_POLICIES):
         raise CollectionError("0.7.1 이상의 CONTEXT.cmd에서 처리가 완료된 결과가 필요합니다.")
     raw = (source / "statements.jsonl").read_bytes()
     if len(raw) > MAX_BYTES or digest(raw) != summary.get("statement_sha256"):
@@ -187,17 +189,29 @@ def make_pack(source, target):
     (target / "items.json").write_bytes(item_bytes)
     (target / "predictions.json").write_bytes(prediction_bytes)
     (target / "manifest.json").write_bytes(canonical(manifest))
-    template = Path(__file__).with_name("text_review.html").read_text(encoding="utf-8")
-    data = {"pack_id": pack_id, "pack_hash": manifest["pack_hash"], "rubric": RUBRIC, "items": items}
-    embedded = canonical(data).decode().replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
-    (target / "review.html").write_text(template.replace("__REVIEW_DATA__", embedded), encoding="utf-8")
+    (target / "review.html").write_text(review_html(manifest, items), encoding="utf-8")
     return manifest
+
+
+def review_html(manifest, items, saved_answers=None):
+    template = Path(__file__).with_name("text_review.html").read_text(encoding="utf-8")
+    data = {"pack_id": manifest["pack_id"], "pack_hash": manifest["pack_hash"], "rubric": RUBRIC, "items": items}
+    if saved_answers is not None:
+        # Only previously validated user-entered fields belong in the editor;
+        # never carry arbitrary extra JSON fields (e.g. program guesses) over.
+        seed = {key: saved_answers[key] for key in ("schema_version", "pack_id", "pack_hash", "rubric", "annotation_source", "reviewer_attestation")}
+        seed["answers"] = [{**{key: row[key] for key in ("id", "text_sha256", "state", "subject", "time_orientation")},
+                            "note": row.get("note", "")} for row in saved_answers["answers"]]
+        data["saved_answers"] = seed
+        data["seed_hash"] = digest(canonical(seed))
+    embedded = canonical(data).decode().replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    return template.replace("__REVIEW_DATA__", embedded)
 
 
 def load_pack(path):
     manifest = read_json(path / "manifest.json", 256_000)
     if (manifest.get("schema_version") != 1 or manifest.get("rubric") != RUBRIC
-            or manifest.get("classification_policy") != "sentence_context_rules_v2"
+            or manifest.get("classification_policy") not in SUPPORTED_POLICIES
             or not re.fullmatch(r"[0-9a-f]{24}", manifest.get("pack_id", ""))):
         raise CollectionError("지원하는 문장 검토 묶음이 아닙니다.")
     unsigned = {k: v for k, v in manifest.items() if k != "pack_hash"}
@@ -296,16 +310,22 @@ def evaluation_html(summary, comparisons, items):
             continue
         item, label = lookup[row["id"]], row["review"]
         same = all(row[axis] == label[axis] for axis in ("subject", "time_orientation"))
-        details.append(f"<details><summary>{'일치' if same else '불일치'} · {esc(item['company_name'])}</summary>"
+        preview = row.get("development_recheck")
+        preview_line = (f"<p>보완 규칙으로 다시 읽은 답 (개발용): {SUBJECT_NAMES[preview['subject']]} / {TIME_NAMES[preview['time_orientation']]}</p>"
+                        if preview else "")
+        details.append(f"<details open><summary>{'일치' if same else '불일치'} · {esc(item['company_name'])}</summary>"
             f"<blockquote>{esc(item['text'])}</blockquote><p>검토자 답: {SUBJECT_NAMES[label['subject']]} / {TIME_NAMES[label['time_orientation']]}</p>"
             f"<p>고정한 프로그램 답: {SUBJECT_NAMES[row['subject']]} / {TIME_NAMES[row['time_orientation']]}</p>"
-            f"<p>메모: {esc(label.get('note', ''))}</p></details>")
+            f"{preview_line}<p>메모: {esc(label.get('note', ''))}</p>"
+            f"<p><a href='review.html#{esc(quote(item['id'], safe=''))}'>이 문장의 답 수정하기</a></p></details>")
     return f"""<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <title>문장 검토 결과</title><style>body{{font-family:system-ui;max-width:1100px;margin:30px auto;padding:16px;line-height:1.8}}td,th{{border-bottom:1px solid #ccc;padding:10px}}table{{border-collapse:collapse}}blockquote{{white-space:pre-wrap;background:#f0f4f8;padding:15px}}details{{padding:15px;border:1px solid #ddd;margin:12px 0}}</style>
 <h1>문장 검토 결과</h1><p>전체 {summary['sampled']}문장 · 답변 {summary['answered']} · 판단 유보 {summary['abstained']} · 미답변 {summary['unanswered']}</p>
 <p>검토자가 직접 입력했다고 확인한 답과 프로그램의 고정 분류를 비교했습니다. 검토자 신원이나 답의 옳음을 외부에서 확인한 결과는 아닙니다. 유보·미답변은 정답으로 채우거나 일치율의 분모에 넣지 않습니다.</p>
+<p><a href='review.html'>저장한 답을 이어서 확인하기</a> · 아래 각 문장의 '이 문장의 답 수정하기'를 누르면 해당 문장으로 바로 이동합니다. 저장한 기존 답은 유지되며 검토자 답을 자동으로 바꾸지 않습니다.</p>
 <table><tr><th>추출 구분</th><th>문장</th><th>답변</th><th>유보</th><th>미답변</th><th>주체 일치</th><th>시점 일치</th><th>둘 다 일치</th></tr>{''.join(rows)}</table>
 <p>일반 추출은 공백을 제외한 동일 문장을 하나로 모은 뒤 해시 순서로 골랐습니다. 오류 점검 추출은 특정 유형을 더 골랐습니다. 두 구분을 합쳐 전체 정확도로 주장하지 않습니다. 비슷한 문장과 같은 회사의 설명은 독립 표본이 아닐 수 있습니다. 이 소수 사례와 1인 검토만으로 전체 문장·다른 회사의 분류 정확도나 통계적 유의성을 입증하지 않습니다.</p>
 <p>이미 확인한 과거 자료에서 고른 개발용 검토입니다. 새 미사용 평가가 아니며, 이 답을 보고 규칙을 고쳤다면 같은 검토 묶음을 새 검증으로 재사용할 수 없습니다. 재학습·모델 승인·주문은 실행하지 않았습니다.</p>
+<p>보완 규칙으로 다시 읽은 답은 오류를 수정한 개발 결과입니다. 위 일치율은 처음 고정한 프로그램 답으로 계산하며, 보완 규칙의 답으로 바꿔 계산하지 않습니다. 보완 결과는 새로운 미사용 검증이 아닙니다.</p>
 <h2>문장별 비교</h2>{''.join(details)}</html>"""

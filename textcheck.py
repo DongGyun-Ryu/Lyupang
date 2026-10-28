@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -12,8 +13,9 @@ from datetime import datetime
 from pathlib import Path
 
 from lyupang import CollectionError, SEOUL
+from evidence_context import POLICY, classify
 from text_validation import (RUBRIC, canonical, digest, evaluate, evaluation_html,
-                             latest_context, load_pack, make_pack, read_json)
+                             latest_context, load_pack, make_pack, read_json, review_html)
 
 
 def prepare(source, root):
@@ -64,6 +66,14 @@ def record_evaluation(pack, labels, root):
     if labels.read_bytes() != original_labels or digest(original_labels) != summary["label_sha256"]:
         raise CollectionError("비교 중 답안 파일이 바뀌었습니다. 저장을 마친 뒤 다시 실행해주세요.")
     _, items, _ = load_pack(pack)
+    # Explicitly separate development rechecks from the original frozen score.
+    # Reviewer answers and original predictions remain exactly as supplied.
+    lookup = {item["id"]: item for item in items}
+    for row in comparisons:
+        if row["state"] == "answered":
+            item = lookup[row["id"]]
+            row["development_recheck"] = classify(item["text"], item["headings"], item["company_name"])
+    summary.update(development_recheck_policy=POLICY, development_recheck_is_validation=False)
     parent = root / "text_validation" / "results"
     parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".pending-", dir=parent))
@@ -73,6 +83,8 @@ def record_evaluation(pack, labels, root):
         (staging / "summary.json").write_bytes(canonical(summary))
         (staging / "comparisons.json").write_bytes(canonical(comparisons))
         (staging / "reviewer_answers.json").write_bytes(original_labels)
+        manifest, _, _ = load_pack(pack)
+        (staging / "review.html").write_text(review_html(manifest, items, json.loads(original_labels.decode("utf-8-sig"))), encoding="utf-8")
         (staging / "report.html").write_text(evaluation_html(summary, comparisons, items), encoding="utf-8")
         # Freeze review questions/predictions alongside answers for later audit.
         for name in ("manifest.json", "items.json", "predictions.json"):

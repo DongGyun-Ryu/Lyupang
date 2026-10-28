@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from lyupang import CollectionError, SEOUL, parse_date
 from research_data import HORIZONS
 
-POLICY = "sentence_context_rules_v2"
+POLICY = "sentence_context_rules_v3"
 COMPANY = re.compile(r"당사|우리\s*회사|연결\s*회사|연결\s*대상\s*회사|연결\s*기준|별도\s*기준")
 # A geographical sales destination ('미국시장에서는') does not establish
 # that the sentence describes the industry rather than the reporting company.
@@ -17,8 +17,12 @@ OUTLOOK = re.compile(r"전망|예상|예측|계획|목표|예정|기대|추정|�
 TECHNICAL_TERMS = (
     ("accounting_term", re.compile(r"기대\s*신용\s*손실|회계\s*추정|추정\s*(?:내용\s*연수|내용연수|잔존\s*가치|잔존가치|공정\s*가치|공정가치)|예상\s*신용\s*손실")),
     ("management_term", re.compile(r"(?:자금\s*수지|현금\s*흐름|현금\s*수지)\s*예측|계획\s*표준\s*생산|(?:확정\s*급여|퇴직\s*급여)\s*계획")),
+    ("organization_term", re.compile(r"추진(?:체계|체|위원회|단|조직|부서|본부|력)")),
 )
 REPORTED = re.compile(r"하였습니다|했습니다|되었습니다|됐습니다|하였으며|했으며|되었으며|기록했|기록하였|달성했|달성하였|집계되었")
+ONGOING = re.compile(r"(?:창출|운영|생산|판매|제조|공급|제공|관리|보유|수행|사용|모니터링)(?:하고|해\s*오고)\s*있습니다")
+ACCOUNTING_AMOUNT = re.compile(r"^(?:당기|전기)의\s*계정과목별\s*손상차손(?:\s*\(환입\))?\s*인식액(?:은|이)")
+FINANCIAL_HEADINGS = re.compile(r"경영진단및분석의견|재무상태및영업실적|재무제표주석")
 PERFORMANCE = re.compile(r"매출|영업이익|순이익|영업손실|판매량|수익성|영업실적|거래액|실적")
 RISK = re.compile(r"위험|리스크|불확실|우려|손실\s*가능|경쟁\s*심화|환율\s*변동")
 COMPANY_HEADINGS = re.compile(r"매출및수주|주요제품|제품및서비스|재무상태및영업실적|영업실적")
@@ -48,6 +52,8 @@ def classify(text, headings, company_name):
         found = [{"start": m.start(), "end": m.end(), "text": m.group()} for m in pattern.finditer(text)]
         if found:
             matches[name] = found
+    for match in ONGOING.finditer(text):
+        matches.setdefault("reported", []).append({"start": match.start(), "end": match.end(), "text": match.group()})
     # Ignore only the cue inside a specifically identified compound term. Keep
     # independent future clauses and the exact source positions for inspection.
     excluded = []
@@ -75,8 +81,18 @@ def classify(text, headings, company_name):
                 matches.setdefault("company", []).append({"start": match.start(), "end": match.end(), "text": match.group()})
     company, industry = bool(matches.get("company")), bool(matches.get("industry"))
     heading_fallback = False
+    headings_text = re.sub(r"\s+", "", " / ".join(headings))
+    amount_match = ACCOUNTING_AMOUNT.search(text)
+    financial_context = bool(amount_match and FINANCIAL_HEADINGS.search(headings_text)
+                             and re.search(r"[0-9][0-9,]*(?:\.[0-9]+)?\s*(?:억원|백만원|천원|원)", text)
+                             and re.search(r"(?:등)?입니다[.!?。]?\s*$", text))
+    financial_fallback = bool(financial_context and not company and not industry)
+    if financial_fallback:
+        company = True
+    if financial_context:
+        matches["financial_amount"] = [{"start": amount_match.start(), "end": amount_match.end(), "text": amount_match.group()}]
     if not company and not industry and matches.get("performance"):
-        heading_fallback = bool(COMPANY_HEADINGS.search(re.sub(r"\s+", "", " / ".join(headings))))
+        heading_fallback = bool(COMPANY_HEADINGS.search(headings_text))
         company = heading_fallback
     subject = "mixed" if company and industry else "company" if company else "industry" if industry else "unclear"
     outlook = bool(matches.get("outlook"))
@@ -84,10 +100,10 @@ def classify(text, headings, company_name):
     # Static numeric performance is a reported-value candidate only without a
     # forward-looking cue. A year or '전년 대비' alone never proves realization.
     numeric_present = bool(matches.get("performance") and re.search(r"[0-9]", text) and re.search(r"입니다|기록입니다", text))
-    if numeric_present and not outlook:
+    if (numeric_present or financial_context) and not outlook:
         reported = True
     orientation = "mixed" if outlook and reported else "outlook" if outlook else "reported" if reported else "unclear"
-    topics = [key for key in ("performance", "risk") if matches.get(key)] or ["business"]
+    topics = [key for key in ("performance", "risk", "financial_amount") if matches.get(key)] or ["business"]
     review_reasons = []
     if subject in {"mixed", "unclear"}:
         review_reasons.append("subject_" + subject)
@@ -103,6 +119,7 @@ def classify(text, headings, company_name):
             "status": "needs_review" if review_reasons else "rule_based_candidate", "matched_expressions": matches,
             "excluded_expressions": excluded, "review_reasons": review_reasons,
             "company_heading_fallback": heading_fallback, "method": POLICY,
+            "financial_heading_fallback": financial_fallback,
             "externally_verified": False, "causal_claim_verified": False}
 
 

@@ -12,7 +12,7 @@ FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", 
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.8.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.8.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -20,7 +20,18 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 문장 직접 검토 0.8.0
+        guide = """Lyupang 문장 직접 검토 0.8.1
+
+이미 검토 결과가 있는 경우:
+새 폴더의 TEXT_CHECK.cmd를 실행하면 저장한 답으로 새 비교 보고서를 만듭니다.
+각 문장 아래 '이 문장의 답 수정하기'를 누르면 그 문장으로 바로 이동합니다.
+기존에 답한 다른 문장은 유지하고, 선택한 문장의 답만 바꾸면 됩니다.
+'확인할 문장 바로가기'에서도 문장 첫 부분을 보고 선택할 수 있습니다.
+직접 답했다는 확인란을 체크하고 답안 파일을 저장한 뒤 TEXT_CHECK.cmd를 다시 실행하세요.
+기존 프로그램 답과 점수는 그대로 보관하며 '보완 규칙으로 다시 읽은 답 (개발용)'을 별도로 표시합니다.
+조직을 뜻하는 '추진체'와 현재의 '창출하고 있습니다', 경영진단의 당기 손상차손 인식액을 보완했습니다.
+이번 두 사례를 보고 고친 개발 결과이며 새로운 미사용 검증이 아닙니다.
+고정 질문·프로그램 답·기존 답안 파일은 덮어쓰지 않고 새 보고서와 편집 화면을 만듭니다.
 
 0.7.1 문장 분류를 마친 경우:
 새 폴더의 TEXT_CHECK.cmd를 실행하세요. 기존 문장·원문과 고정한 프로그램 답을 재사용합니다.

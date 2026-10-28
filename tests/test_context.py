@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import business
 import contextualize
-from evidence_context import annotate, classify, mark_overlaps, release_outcomes, sentence_spans
+from evidence_context import POLICY, annotate, classify, mark_overlaps, release_outcomes, sentence_spans
 from lyupang import DailyBar
 from test_business import CORP, archive, filing
 from test_research_data import series, snapshot
@@ -32,6 +32,38 @@ def prices():
 
 
 class ContextRulesTests(unittest.TestCase):
+    def test_organization_nouns_and_ongoing_activity_do_not_turn_into_future_plans(self):
+        for noun in ("추진체", "추진체계", "추진위원회", "추진단", "추진부서", "추진본부"):
+            text = f"네이버는 사업 {noun}를 중심으로 협력과 시너지를 창출하고 있습니다."
+            result = classify(text, ["II. 사업의 내용"], "NAVER")
+            self.assertEqual(result["subject"], "company")
+            self.assertEqual(result["time_orientation"], "reported")
+            self.assertNotIn("outlook", result["matched_expressions"])
+            self.assertTrue(result["excluded_expressions"])
+            self.assertEqual(result["status"], "needs_review")
+        future = classify("네이버는 사업 추진체를 중심으로 시너지를 창출할 예정입니다.", [], "NAVER")
+        self.assertEqual(future["time_orientation"], "outlook")
+        self.assertTrue(any(m["text"] == "예정" for m in future["matched_expressions"]["outlook"]))
+        forecast = classify("당사는 내년 수요가 늘어날 것으로 예상하고 있습니다.", [], "삼성전자")
+        self.assertEqual(forecast["time_orientation"], "outlook")
+        mixed = classify("당사는 제품을 공급하고 있습니다. 내년에 설비를 확대할 계획입니다.", [], "삼성전자")
+        self.assertEqual(mixed["time_orientation"], "mixed")
+
+    def test_period_accounting_amount_needs_explicit_financial_heading_and_amount(self):
+        text = "당기의 계정과목별 손상차손(환입) 인식액은 투자주식 1,053억원, 영업권 78억 등입니다."
+        heads = ["IV. 이사의 경영진단 및 분석의견"]
+        result = classify(text, heads, "NAVER")
+        self.assertEqual((result["subject"], result["time_orientation"]), ("company", "reported"))
+        self.assertTrue(result["financial_heading_fallback"])
+        self.assertIn("financial_amount", result["matched_expressions"])
+        for without_context in ([], ["산업 동향"]):
+            result = classify(text, without_context, "NAVER")
+            self.assertEqual((result["subject"], result["time_orientation"]), ("unclear", "unclear"))
+        for unsupported in (text.replace("1,053억원", "일정 금액"), "경쟁회사의 " + text,
+                            text.replace("등입니다.", "등으로 예상됩니다.")):
+            result = classify(unsupported, heads, "NAVER")
+            self.assertFalse(result["financial_heading_fallback"])
+
     def test_accounting_and_management_terms_do_not_establish_a_forecast(self):
         # Authored regression examples, not a held-out accuracy benchmark.
         texts = [
@@ -219,7 +251,7 @@ class ContextWorkflowTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256((target / "statements.jsonl").read_bytes()).hexdigest(), summary["statement_sha256"])
         self.assertFalse(summary["live_trading_allowed"])
         self.assertFalse(summary["fresh_unseen_evidence"])
-        self.assertEqual(summary["classification_policy"], "sentence_context_rules_v2")
+        self.assertEqual(summary["classification_policy"], POLICY)
         report = (target / "report.html").read_text()
         self.assertIn("용어 혼동 점검", report)
         self.assertIn("정확도가 높아졌다고 판단하지 않습니다", report)
