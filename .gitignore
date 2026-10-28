@@ -9,5 +9,6 @@ learning/
 financial_documents/
 diagnostics/
 evaluation_registry/
+forward/
 .env
 *.log

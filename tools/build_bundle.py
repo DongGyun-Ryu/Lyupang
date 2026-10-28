@@ -6,11 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
-         "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd")
+         "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.4.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.5.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -18,7 +18,19 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 학습 결과 성능 진단 0.4.0
+        guide = """Lyupang 새 예측 관찰 0.5.0
+
+이미 학습과 진단을 마친 경우:
+OBSERVE.cmd를 실행합니다. 기존 모델을 고정하고 새 예측을 기록합니다.
+탈락 모델은 제외합니다. 모델 재학습과 실제 주문은 수행하지 않습니다.
+처음 실행하면 브라우저에서 관찰 보고서를 엽니다.
+창과 컴퓨터를 켜두면 한국 시간 매일 오전 8시 30분에 자동 확인합니다.
+오전 9시 이후에는 새 예측은 대기하고 기존 결과만 비교합니다.
+예측과 결과는 %LOCALAPPDATA%\\Lyupang\\forward에 보관합니다.
+창을 닫거나 PC를 껐다면 다음 실행에서 이어갑니다. 놓친 예측은 소급하지 않습니다.
+새 검증에도 가격·DART 조회가 필요하며 기존 인증정보를 재사용합니다.
+5일봉 등의 관찰 기간이 지나야 결과가 나오므로 처음에는 결과 대기가 정상입니다.
+이 단계는 예측 오차 관찰입니다. 매매 규칙·모의매매·자동 재학습은 아직 없습니다.
 
 이미 학습을 마친 경우:
 REVIEW.cmd를 실행합니다. 저장된 최신 모델과 평가 자료만 읽어 진단합니다.
@@ -64,7 +76,8 @@ TRAIN.cmd를 실행합니다. 저장한 최신 연구 결과와 기존 DART 키�
 이 버전은 연구용 학습까지 수행할 수 있습니다. 실제 주문은 실행하지 않습니다.
 기존 3종목 가격·DART 수집은 사용자 PC에서 검증됐습니다.
 기존 0.3.1 원문 해석·학습은 사용자 PC에서 성공했습니다.
-새 진단 기능의 실제 결과는 PC 실행 후 확인해야 합니다.
+기존 0.4.0 진단도 사용자 PC에서 재계산이 확인됐습니다.
+새 예측 기록 기능의 실제 연결은 PC 실행 후 확인해야 합니다.
 
 상세한 기능과 데이터 한계는 README.md에 있습니다.
 """

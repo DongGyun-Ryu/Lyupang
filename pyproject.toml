@@ -1,7 +1,7 @@
 [project]
 name = "lyupang"
-version = "0.4.0"
-description = "연구용 학습 모델의 성능 진단과 자동 보류"
+version = "0.5.0"
+description = "고정 모델의 새 예측 기록과 이후 결과 자동 비교"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 
