@@ -11,7 +11,7 @@ FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", 
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.6.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.6.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -19,7 +19,14 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 사업보고서 근거 모음 0.6.0
+        guide = """Lyupang 사업보고서 근거 모음 0.6.1
+
+0.6.0에서 본문 읽기 0/14건으로 나온 경우:
+새 폴더의 BUSINESS.cmd만 다시 실행하세요. 저장된 본문 ZIP은 해시 확인 후 재사용합니다.
+본문의 R&D, < TV 시장점유율 추이 >, <이사ㆍ감사 전체의 보수현황> 표기를 글자로 보존해 읽습니다.
+원본 ZIP을 변경하거나 문서 구조를 추정해 복구하지 않습니다.
+사용자 제공 삼성전자 원문 4건에서 읽기·발췌·보고서 생성까지 확인했습니다.
+현대차·NAVER 원문 10건의 실제 재실행 결과는 추가 확인이 필요합니다.
 
 새 사업보고서 설명 수집:
 BUSINESS.cmd를 실행합니다. 기존 DART 키와 연구 종목 목록을 사용합니다.

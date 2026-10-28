@@ -1,6 +1,6 @@
 [project]
 name = "lyupang"
-version = "0.6.0"
+version = "0.6.1"
 description = "사업보고서 사업·실적 설명의 출처별 수집"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]

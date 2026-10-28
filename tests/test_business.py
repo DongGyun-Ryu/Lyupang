@@ -3,6 +3,7 @@ import io
 import json
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 import zipfile
 from contextlib import redirect_stdout
 from datetime import date
@@ -47,6 +48,52 @@ def filing(receipt=RECEIPT, day="2025-03-11", title="사업보고서 (2024.12)")
 
 
 class BusinessTextTests(unittest.TestCase):
+    def test_observed_dart_literal_characters_preserve_text_without_structure_recovery(self):
+        extra = '<P>R&D 및 S&P 관련 설명입니다. < TV 시장점유율 추이 >와 <이사ㆍ감사 전체의 보수현황>을 확인합니다.</P>'
+        raw = xml_document(extra=extra)
+        with self.assertRaises(ET.ParseError):
+            ET.fromstring(raw)
+        root = bt.validated_root(raw)
+        blocks = bt.extract_blocks(root)
+        paragraph = next(b for b in blocks if 'R&D 및 S&P' in b['text'])
+        self.assertIn('< TV 시장점유율 추이 >', paragraph['text'])
+        self.assertIn('<이사ㆍ감사 전체의 보수현황>', paragraph['text'])
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(metadata['literal_ampersands_encoded'], 2)
+        self.assertEqual(metadata['literal_less_than_encoded'], 2)
+        self.assertEqual(metadata['original_xml_sha256'], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(metadata['prepared_xml_sha256'], hashlib.sha256(prepared.encode()).hexdigest())
+        self.assertTrue(metadata['normalization_applied'])
+        prepared_twice, repeated = bt.prepare_xml(prepared.encode())
+        self.assertEqual(prepared, prepared_twice)
+        self.assertFalse(repeated['normalization_applied'])
+
+    def test_cdata_comments_processing_instructions_and_existing_references_are_unchanged(self):
+        extra = ('<!-- R&D < TV label > --><P><![CDATA[R&D < TV label > &amp; raw]]></P>'
+                 '<?note text="R&D < literal >"?><P>R&amp;D &lt;표시&gt; &#38; &#x26;</P>')
+        raw = xml_document(extra=extra)
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(prepared.encode(), raw)
+        self.assertFalse(metadata['normalization_applied'])
+        text = bt.text_of(bt.validated_root(raw))
+        self.assertIn('R&D < TV label > &amp; raw', text)
+        self.assertIn('R&D <표시> & &', text)
+
+    def test_valid_unicode_elements_and_attributes_are_not_reinterpreted_as_text(self):
+        raw = '<DOCUMENT><한글 설명="정상">내용</한글><한글 >내용</한글><P>원래 &amp; 표기</P></DOCUMENT>'.encode()
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(prepared.encode(), raw)
+        self.assertEqual(bt.validated_root(raw).find('한글').text, '내용')
+        self.assertFalse(metadata['normalization_applied'])
+
+    def test_unknown_entities_mismatched_tags_and_invalid_numeric_references_still_fail(self):
+        for raw in (b'<DOCUMENT><P>&unknown;</P></DOCUMENT>', b'<DOCUMENT><P>R&D</DOCUMENT>',
+                    b'<DOCUMENT><P>&#0;</P></DOCUMENT>', b'<DOCUMENT><P>&#xZZ;</P></DOCUMENT>'):
+            with self.subTest(raw=raw), self.assertRaisesRegex(CollectionError, '형식 코드'):
+                bt.validated_root(raw)
+        with patch('business_text.MAX_LITERAL_CHARACTERS', 1), self.assertRaises(CollectionError):
+            bt.validated_root(b'<DOCUMENT><P>R&D S&P</P></DOCUMENT>')
+
     def test_receipt_identity_sections_and_every_quote_map_to_exact_source_substring(self):
         member, raw, root = bt.main_document(archive(), RECEIPT, CORP)
         self.assertEqual(member, RECEIPT + ".xml")
@@ -183,6 +230,23 @@ class BusinessWorkflowTests(unittest.TestCase):
         self.assertEqual(original.read_bytes(), b"corrupted")
         self.assertEqual(len(list((self.root / "business_documents").glob("*/original.zip"))), 2)
         self.assertEqual(self.client.original_document.call_count, 2)
+
+    def test_cached_literal_character_document_is_read_without_rewrite_or_redownload(self):
+        xml = xml_document(extra='<P>R&D 및 S&P 설명 < TV 시장점유율 추이 > <이사ㆍ감사 전체의 보수현황></P>')
+        raw = archive(xml)
+        self.client.original_document.return_value = raw
+        target, summary = self.run_business()
+        event = summary['stocks'][0]['selected']['event']
+        parsing = event['xml_parsing']
+        self.assertEqual(parsing['literal_ampersands_encoded'], 2)
+        self.assertEqual(parsing['literal_less_than_encoded'], 2)
+        self.assertEqual(event['xml_sha256'], hashlib.sha256(xml).hexdigest())
+        cache_file = next((self.root / 'business_documents').glob('*/original.zip'))
+        self.assertEqual(cache_file.read_bytes(), raw)
+        self.run_business()
+        self.client.original_document.assert_called_once_with(RECEIPT)
+        self.assertEqual(cache_file.read_bytes(), raw)
+        self.assertIn('R&amp;D', (target / event['source_html']).read_text(encoding='utf-8'))
 
     def test_unreadable_latest_correction_blocks_previous_success_and_keeps_all_targets(self):
         correction = filing("20260311000001", "2026-03-11", "[기재정정]사업보고서 (2024.12)")

@@ -26,6 +26,12 @@ CATEGORIES = {"overview": "사업 개요", "products": "주요 제품·서비스
 MAX_QUOTES = 5
 QUOTE_LENGTH = 1200
 IGNORED = {"SCRIPT", "STYLE", "NOSCRIPT"}
+# DART bodies contain literal R&D and < TV ... > / <이사 ...> labels.
+# Preserve XML references and literal sections; never recover broken structure.
+PROTECTED_XML = re.compile(r"<!\[CDATA\[.*?\]\]>|<!--.*?-->|<\?.*?\?>", re.S)
+BARE_AMPERSAND = re.compile(r"&(?![^&<>\s;]+;|#)")
+LITERAL_LT = re.compile(r"<(?=[\s0-9=])|<[가-힣][^<>=/'\"\r\n]{0,160}[ \t][^\s<>=/'\"][^<>=/'\"\r\n]{0,160}>")
+MAX_LITERAL_CHARACTERS = 100_000
 
 
 def local(tag):
@@ -56,7 +62,14 @@ def text_of(node):
     return re.sub(r"\s+", " ", "".join(parts)).strip()
 
 
-def validated_root(raw):
+def prepare_xml(raw):
+    """Encode observed literal characters for parsing without rewriting source files.
+
+    CDATA, comments and processing instructions are copied byte-for-byte as text.
+    Unknown entity references and mismatched tags remain errors. Korean angle
+    labels must contain whitespace and no XML attribute/closing-tag syntax;
+    legitimate Unicode element names and attributes are left alone.
+    """
     if len(raw) > MAX_XML:
         raise CollectionError("사업보고서 XML이 지원 크기를 넘었습니다.")
     try:
@@ -65,10 +78,44 @@ def validated_root(raw):
         raise CollectionError("사업보고서 XML이 지원하는 UTF-8 형식이 아닙니다.") from None
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", text, re.I):
         raise CollectionError("사업보고서 XML에 지원하지 않는 DTD·엔티티 선언이 있습니다.")
+    counts = {"literal_ampersands_encoded": 0, "literal_less_than_encoded": 0}
+
+    def replace(match, key, replacement):
+        counts[key] += 1
+        if sum(counts.values()) > MAX_LITERAL_CHARACTERS:
+            raise CollectionError("사업보고서의 특수문자 표기 수가 지원 범위를 넘었습니다.")
+        return replacement + match.group()[1:]
+
+    def encode(segment):
+        segment = BARE_AMPERSAND.sub(lambda m: replace(m, "literal_ampersands_encoded", "&amp;"), segment)
+        return LITERAL_LT.sub(lambda m: replace(m, "literal_less_than_encoded", "&lt;"), segment)
+
+    parts, end = [], 0
+    for protected in PROTECTED_XML.finditer(text):
+        parts.append(encode(text[end:protected.start()]))
+        parts.append(protected.group())
+        end = protected.end()
+    parts.append(encode(text[end:]))
+    prepared = "".join(parts)
+    prepared_bytes = prepared.encode("utf-8")
+    if len(prepared_bytes) > MAX_XML:
+        raise CollectionError("특수문자 표기를 처리한 사업보고서가 지원 크기를 넘었습니다.")
+    return prepared, {"policy": "literal_text_characters_v1", **counts,
+                      "normalization_applied": bool(sum(counts.values())),
+                      "original_xml_sha256": hashlib.sha256(raw).hexdigest(),
+                      "prepared_xml_sha256": hashlib.sha256(prepared_bytes).hexdigest()}
+
+
+def validated_root(raw):
+    text, _ = prepare_xml(raw)
     try:
         root = ET.fromstring(text)
-    except (ET.ParseError, ValueError):
-        raise CollectionError("사업보고서 XML을 읽지 못했습니다. 원문 형식을 확인해야 합니다.") from None
+    except ET.ParseError as exc:
+        line, column = exc.position
+        raise CollectionError(f"사업보고서 XML을 읽지 못했습니다. 원문 형식을 확인해야 합니다. "
+                              f"(처리 본문 {line}행 {column}열, 형식 코드 {exc.code})") from None
+    except ValueError:
+        raise CollectionError("사업보고서 XML의 선언 형식을 확인해야 합니다.") from None
     stack, count = [(root, 0)], 0
     while stack:
         element, depth = stack.pop()

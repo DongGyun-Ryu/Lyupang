@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from business_text import (CATEGORIES, cached_document, evidence_as_of, extract_blocks, extract_evidence,
-                           main_document, source_html)
+                           main_document, prepare_xml, source_html)
 from dart_client import DartClient, DartError, is_annual_report, stored_key
 from financial_history import report_period
 from lyupang import CollectionError, SEOUL, parse_date
@@ -83,6 +83,7 @@ def render_report(summary):
 {''.join(sections)}
 <h2>이번 기능의 범위</h2><p>실적 변화에 관한 회사 설명과 전망·계획이 섞여 있을 수 있습니다. 자동 발췌는 모든 설명을 찾거나 의미를 정확히 이해한다고 보장하지 않습니다. 표 전체의 병합셀·단위·범위를 해석해 수치를 재계산하지 않습니다.</p>
 <p>정정은 그 접수일 이후에만 선택하며 최신 원문을 못 읽거나 같은 날 여러 대상이 있으면 이전 설명으로 대신 채우지 않습니다. 읽지 못한 문서는 해당 이유를 표시합니다. 보관된 ZIP·XML 해시와 추출 문단 위치로 원문을 대조할 수 있습니다.</p>
+<p>일부 DART 본문에 들어 있는 R&amp;D, &lt; TV 시장점유율 추이 &gt; 같은 표기는 글자로 보존해 읽습니다. 원본 ZIP을 바꾸거나 태그 누락·문서 구조를 추정해 복구하지 않습니다.</p>
 <p>기존 고정 모델·예측 기록은 바꾸지 않습니다. 이번 본문을 예측 입력에 추가하거나 재학습·뉴스 수집·모의매매·실제 주문을 실행하지 않았습니다. 추후 본문 기반 모델은 이미 확인한 과거 평가 기간을 새 검증으로 재사용할 수 없습니다.</p></html>"""
 
 
@@ -151,6 +152,7 @@ def run(source, output_root, cache, client, *, progress=print):
                     try:
                         raw, meta, folder = cached_document(cache, code, corp, event["receipt_no"], client)
                         member, xml, document = main_document(raw, event["receipt_no"], corp)
+                        _, parsing = prepare_xml(xml)
                         blocks = extract_blocks(document)
                         evidence = extract_evidence(blocks)
                         stem = f"{code}_{event['receipt_no']}"
@@ -160,6 +162,7 @@ def run(source, output_root, cache, client, *, progress=print):
                         event.update(status="read", evidence=evidence, company_identity_verified=True, document_kind_verified=True,
                             archive_sha256=meta["sha256"], archive_path=str(folder.resolve()), retrieved_at=meta["retrieved_at"],
                             xml_member=member, xml_sha256=hashlib.sha256(xml).hexdigest(), block_count=len(blocks),
+                            xml_parsing=parsing,
                             source_blocks=f"sources/{stem}.json", source_blocks_sha256=hashlib.sha256(blocks_content).hexdigest(),
                             source_html=f"sources/{stem}.html")
                         item["read_reports"] += 1
