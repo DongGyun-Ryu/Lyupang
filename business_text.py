@@ -30,7 +30,23 @@ IGNORED = {"SCRIPT", "STYLE", "NOSCRIPT"}
 # Preserve XML references and literal sections; never recover broken structure.
 PROTECTED_XML = re.compile(r"<!\[CDATA\[.*?\]\]>|<!--.*?-->|<\?.*?\?>", re.S)
 BARE_AMPERSAND = re.compile(r"&(?![^&<>\s;]+;|#)")
-LITERAL_LT = re.compile(r"<(?=[\s0-9=])|<[가-힣][^<>=/'\"\r\n]{0,160}[ \t][^\s<>=/'\"][^<>=/'\"\r\n]{0,160}>")
+LITERAL_LT = re.compile(r"<(?=[\s0-9=\-])|<[가-힣][^<>=/'\"\r\n]{0,160}[ \t][^\s<>=/'\"][^<>=/'\"\r\n]{0,160}>")
+# Only literal labels observed in the supplied DART originals. Unknown unpaired
+# tags still fail. A corresponding closing tag makes interpretation ambiguous,
+# so paired Unicode elements are never converted into labels.
+DART_LITERAL_LABELS = frozenset({
+    "기후변화", "자원순환", "자원사용", "유해가스", "유해물질", "표1", "표2",
+    "당기말", "전기말", "당기", "전기", "인테그리티코드", "워케이션", "금융자산", "금융부채",
+    "Manufacturing Excellence", "New Product Innovation: Hyundai & Genesis", "Advanced Tech & SDV",
+    "Investing for the Future & Innovative Partnerships", "Connected Work", "Human Rights", "OIC(Open Idea Challenge)",
+})
+ENCODED_LABELS = {html.escape(name, quote=False): name for name in DART_LITERAL_LABELS}
+LABEL_ALTERNATIVES = "|".join(re.escape(name) for name in sorted(ENCODED_LABELS))
+LITERAL_LABEL = re.compile(r"<(?P<label>" + LABEL_ALTERNATIVES + r")>")
+CLOSING_LABEL = re.compile(r"</(?P<label>" + LABEL_ALTERNATIVES + r")\s*>")
+OPEN_XML_TAG = re.compile(r"<[A-Za-z_:][^<>]{0,8192}>")
+ENG_ATTRIBUTE = re.compile(r'(?P<prefix>(?<=\s)ENG=")(?P<value>[^<>\r\n]{0,2048}?)"'
+                           r'(?=\s*(?:[A-Za-z_:][\w.:-]*\s*=|/?>))')
 MAX_LITERAL_CHARACTERS = 100_000
 
 
@@ -66,9 +82,10 @@ def prepare_xml(raw):
     """Encode observed literal characters for parsing without rewriting source files.
 
     CDATA, comments and processing instructions are copied byte-for-byte as text.
-    Unknown entity references and mismatched tags remain errors. Korean angle
-    labels must contain whitespace and no XML attribute/closing-tag syntax;
-    legitimate Unicode element names and attributes are left alone.
+    Unknown entity references and mismatched tags remain errors. Observed literal
+    labels without a matching closing tag and extra quotes inside ENG display
+    attributes are encoded as characters, not removed or completed. Other valid
+    Unicode elements and attributes are left alone.
     """
     if len(raw) > MAX_XML:
         raise CollectionError("사업보고서 XML이 지원 크기를 넘었습니다.")
@@ -78,29 +95,57 @@ def prepare_xml(raw):
         raise CollectionError("사업보고서 XML이 지원하는 UTF-8 형식이 아닙니다.") from None
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", text, re.I):
         raise CollectionError("사업보고서 XML에 지원하지 않는 DTD·엔티티 선언이 있습니다.")
-    counts = {"literal_ampersands_encoded": 0, "literal_less_than_encoded": 0}
+    counts = {"literal_ampersands_encoded": 0, "literal_less_than_encoded": 0,
+              "attribute_quote_characters_encoded": 0}
+    label_counts, eng_count = {}, 0
+
+    def check_limit():
+        if sum(counts.values()) > MAX_LITERAL_CHARACTERS:
+            raise CollectionError("사업보고서의 특수문자 표기 수가 지원 범위를 넘었습니다.")
 
     def replace(match, key, replacement):
         counts[key] += 1
-        if sum(counts.values()) > MAX_LITERAL_CHARACTERS:
-            raise CollectionError("사업보고서의 특수문자 표기 수가 지원 범위를 넘었습니다.")
+        check_limit()
         return replacement + match.group()[1:]
+
+    segments, end = [], 0
+    for protected in PROTECTED_XML.finditer(text):
+        segments.append((False, text[end:protected.start()]))
+        segments.append((True, protected.group()))
+        end = protected.end()
+    segments.append((False, text[end:]))
+    closed_labels = {ENCODED_LABELS[m["label"]] for protected, segment in segments if not protected
+                     for m in CLOSING_LABEL.finditer(segment)}
+
+    def encode_label(match):
+        name = ENCODED_LABELS[match["label"]]
+        if name in closed_labels:
+            return match.group()
+        label_counts[name] = label_counts.get(name, 0) + 1
+        return replace(match, "literal_less_than_encoded", "&lt;")
+
+    def encode_eng(match):
+        nonlocal eng_count
+        count = match["value"].count('"')
+        if not count:
+            return match.group()
+        counts["attribute_quote_characters_encoded"] += count
+        eng_count += 1
+        check_limit()
+        return match["prefix"] + match["value"].replace('"', "&quot;") + '"'
 
     def encode(segment):
         segment = BARE_AMPERSAND.sub(lambda m: replace(m, "literal_ampersands_encoded", "&amp;"), segment)
-        return LITERAL_LT.sub(lambda m: replace(m, "literal_less_than_encoded", "&lt;"), segment)
+        segment = LITERAL_LT.sub(lambda m: replace(m, "literal_less_than_encoded", "&lt;"), segment)
+        segment = LITERAL_LABEL.sub(encode_label, segment)
+        return OPEN_XML_TAG.sub(lambda tag: ENG_ATTRIBUTE.sub(encode_eng, tag.group()), segment)
 
-    parts, end = [], 0
-    for protected in PROTECTED_XML.finditer(text):
-        parts.append(encode(text[end:protected.start()]))
-        parts.append(protected.group())
-        end = protected.end()
-    parts.append(encode(text[end:]))
-    prepared = "".join(parts)
+    prepared = "".join(segment if protected else encode(segment) for protected, segment in segments)
     prepared_bytes = prepared.encode("utf-8")
     if len(prepared_bytes) > MAX_XML:
         raise CollectionError("특수문자 표기를 처리한 사업보고서가 지원 크기를 넘었습니다.")
-    return prepared, {"policy": "literal_text_characters_v1", **counts,
+    return prepared, {"policy": "literal_text_characters_v2", **counts,
+                      "literal_labels_encoded": dict(sorted(label_counts.items())), "eng_attributes_encoded": eng_count,
                       "normalization_applied": bool(sum(counts.values())),
                       "original_xml_sha256": hashlib.sha256(raw).hexdigest(),
                       "prepared_xml_sha256": hashlib.sha256(prepared_bytes).hexdigest()}

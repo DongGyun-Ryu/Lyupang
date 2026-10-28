@@ -94,6 +94,68 @@ class BusinessTextTests(unittest.TestCase):
         with patch('business_text.MAX_LITERAL_CHARACTERS', 1), self.assertRaises(CollectionError):
             bt.validated_root(b'<DOCUMENT><P>R&D S&P</P></DOCUMENT>')
 
+    def test_observed_unpaired_labels_english_phrases_and_arrow_preserve_original_text(self):
+        extra = '<P><기후변화> 설명 <당기말> 금액 <Connected Work> 제도 <Advanced Tech & SDV> 송<->수신</P>'
+        raw = xml_document(extra=extra)
+        with self.assertRaises(ET.ParseError):
+            ET.fromstring(raw)
+        root = bt.validated_root(raw)
+        text = bt.text_of(root)
+        for literal in ('<기후변화>', '<당기말>', '<Connected Work>', '<Advanced Tech & SDV>', '송<->수신'):
+            self.assertIn(literal, text)
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(metadata['literal_labels_encoded'], {
+            '기후변화': 1, '당기말': 1, 'Connected Work': 1, 'Advanced Tech & SDV': 1})
+        self.assertEqual(metadata['literal_less_than_encoded'], 5)
+        self.assertEqual(prepared, bt.prepare_xml(prepared.encode())[0])
+
+    def test_known_paired_unicode_tags_remain_elements_and_ambiguous_or_unknown_tags_fail(self):
+        raw = '<DOCUMENT><당기말>값</당기말><기후변화 설명="정상">설명</기후변화></DOCUMENT>'.encode()
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(prepared.encode(), raw)
+        self.assertFalse(metadata['normalization_applied'])
+        self.assertEqual(bt.validated_root(raw).find('당기말').text, '값')
+        for raw in ('<DOCUMENT><P><미확인표제></P></DOCUMENT>',
+                    '<DOCUMENT><당기말>값</당기말><P><당기말></P></DOCUMENT>'):
+            with self.subTest(raw=raw), self.assertRaises(CollectionError):
+                bt.validated_root(raw.encode())
+
+    def test_observed_eng_quote_errors_preserve_attribute_characters_and_body_text(self):
+        for value, expected in (('"Snow Corporation', '"Snow Corporation'),
+                                ('Other receivables and others"', 'Other receivables and others"')):
+            raw = f'<DOCUMENT><TE ENG="{value}" VALIGN="MIDDLE">회사 설명</TE></DOCUMENT>'.encode()
+            with self.assertRaises(ET.ParseError):
+                ET.fromstring(raw)
+            root = bt.validated_root(raw)
+            self.assertEqual(root.find('TE').get('ENG'), expected)
+            self.assertEqual(root.find('TE').get('VALIGN'), 'MIDDLE')
+            self.assertEqual(root.find('TE').text, '회사 설명')
+            prepared, metadata = bt.prepare_xml(raw)
+            self.assertEqual(metadata['eng_attributes_encoded'], 1)
+            self.assertEqual(metadata['attribute_quote_characters_encoded'], 1)
+            self.assertEqual(prepared, bt.prepare_xml(prepared.encode())[0])
+
+    def test_literal_label_and_eng_processing_leave_protected_sections_and_valid_attributes_unchanged(self):
+        raw = ('<DOCUMENT><!-- <당기말> ENG=""Snow" -->'
+               '<?note value="<당기말> ENG=""Snow""?>'
+               '<P><![CDATA[<당기말> ENG=""Snow" </당기말>]]></P>'
+               '<TE ENG="&quot;Snow Corporation" VALIGN="MIDDLE">값</TE>'
+               '<P>ENG=""Snow"</P></DOCUMENT>').encode()
+        prepared, metadata = bt.prepare_xml(raw)
+        self.assertEqual(prepared.encode(), raw)
+        self.assertFalse(metadata['normalization_applied'])
+        bt.validated_root(raw)
+        raw = '<DOCUMENT><P><당기말><![CDATA[</당기말>]]></P></DOCUMENT>'.encode()
+        self.assertIn('<당기말></당기말>', bt.text_of(bt.validated_root(raw)))
+
+    def test_non_eng_quote_errors_and_unterminated_attributes_still_fail_and_budget_applies(self):
+        for raw in (b'<DOCUMENT><TE TITLE=""Snow">body</TE></DOCUMENT>',
+                    b'<DOCUMENT><TE ENG="Snow>body</TE></DOCUMENT>'):
+            with self.subTest(raw=raw), self.assertRaises(CollectionError):
+                bt.validated_root(raw)
+        with patch('business_text.MAX_LITERAL_CHARACTERS', 1), self.assertRaises(CollectionError):
+            bt.validated_root(b'<DOCUMENT><TE ENG=""Snow"">body</TE></DOCUMENT>')
+
     def test_receipt_identity_sections_and_every_quote_map_to_exact_source_substring(self):
         member, raw, root = bt.main_document(archive(), RECEIPT, CORP)
         self.assertEqual(member, RECEIPT + ".xml")
@@ -247,6 +309,24 @@ class BusinessWorkflowTests(unittest.TestCase):
         self.client.original_document.assert_called_once_with(RECEIPT)
         self.assertEqual(cache_file.read_bytes(), raw)
         self.assertIn('R&amp;D', (target / event['source_html']).read_text(encoding='utf-8'))
+
+    def test_new_label_and_eng_formats_flow_through_cached_evidence_report_without_original_changes(self):
+        xml = xml_document(extra='<P>지원 제도 <Connected Work> 및 표제 <당기말></P>'
+                                 '<TABLE><TR><TE ENG=""Snow Corporation" WIDTH="100">회사명</TE></TR></TABLE>')
+        original = archive(xml)
+        self.client.original_document.return_value = original
+        target, summary = self.run_business()
+        self.assertEqual(summary['status'], 'collected')
+        event = summary['stocks'][0]['selected']['event']
+        self.assertEqual(event['xml_parsing']['eng_attributes_encoded'], 1)
+        self.assertEqual(event['xml_parsing']['literal_labels_encoded']['당기말'], 1)
+        self.assertEqual(event['xml_sha256'], hashlib.sha256(xml).hexdigest())
+        cached = next((self.root / 'business_documents').glob('*/original.zip'))
+        self.assertEqual(cached.read_bytes(), original)
+        self.run_business()
+        self.client.original_document.assert_called_once()
+        self.assertEqual(cached.read_bytes(), original)
+        self.assertIn('&lt;Connected Work&gt;', (target / event['source_html']).read_text(encoding='utf-8'))
 
     def test_unreadable_latest_correction_blocks_previous_success_and_keeps_all_targets(self):
         correction = filing("20260311000001", "2026-03-11", "[기재정정]사업보고서 (2024.12)")
