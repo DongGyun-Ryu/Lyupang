@@ -7,11 +7,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
-         "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd")
+         "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
+         "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.7.1.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.8.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -19,7 +20,21 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 설명 구분과 공개 이후 가격 0.7.1
+        guide = """Lyupang 문장 직접 검토 0.8.0
+
+0.7.1 문장 분류를 마친 경우:
+새 폴더의 TEXT_CHECK.cmd를 실행하세요. 기존 문장·원문과 고정한 프로그램 답을 재사용합니다.
+브라우저의 문장 직접 확인 화면에서 1번(회사/산업 등), 2번(과거·현재/미래 등)을 고릅니다.
+어려우면 '이 문장은 판단하기 어렵습니다'를 선택하세요. 몇 문장만 해도 됩니다.
+화면 아래 직접 답했다는 항목을 체크한 뒤 '답안 파일 저장'을 누릅니다.
+다운로드가 끝나면 TEXT_CHECK.cmd를 다시 실행해 검토 결과를 엽니다.
+파일을 찾지 못하면 내려받은 Lyupang-text-labels-...json을 TEXT_CHECK.cmd 위에 끌어다 놓으세요.
+이전 답을 고치거나 이어하려면 review.html을 다시 열고 '저장한 답안 이어하기'로 불러옵니다.
+검토 화면은 %LOCALAPPDATA%\\Lyupang\\text_validation\\packs의 해당 폴더에 있습니다.
+처음에 최대 24문장을 고르고 같은 묶음을 이어갑니다. 프로그램 답과 주가를 숨긴 채 답합니다.
+일반 추출과 오류 점검 추출은 따로 비교합니다. 유보·미답변에는 정답을 채우지 않습니다.
+사람이 답하기 전에는 일치율이 없습니다. 1인의 소수 검토가 전체 정확도를 보장하지 않습니다.
+기존 모델·예측·원문·가격은 바꾸지 않습니다. 재학습·실제 주문도 실행하지 않습니다.
 
 0.7.0의 문장·가격 연결을 마친 경우:
 새 폴더의 CONTEXT.cmd만 다시 실행하세요. 기존 자료를 재사용합니다.

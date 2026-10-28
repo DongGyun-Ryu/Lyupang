@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>문장 직접 확인</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 20px 60px;line-height:1.8;color:#182b43}
+button,select,input,textarea{font:inherit}button{padding:10px 18px;cursor:pointer}button:disabled{cursor:default;opacity:.5}
+select{display:block;width:100%;padding:10px;margin:6px 0 16px}textarea{display:block;box-sizing:border-box;width:100%;padding:10px}
+blockquote{white-space:pre-wrap;margin:16px 0;padding:20px;background:#f0f5fb;border-left:4px solid #376db0}
+.note{padding:16px;background:#fff3d5;border-radius:8px}.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:15px 0}
+details{margin:18px 0}pre{white-space:pre-wrap;font:inherit;background:#f4f4f4;padding:14px}.small{font-size:14px;color:#53647a}
+#status{font-weight:bold}label{display:block}#attest-label{margin:16px 0}h2{font-size:22px}a{color:#255a98}
+</style>
+<h1>문장 직접 확인</h1>
+<p>보고서 문장을 읽고 두 가지를 선택해주세요. 코딩 지식은 필요 없습니다. 프로그램의 분류는 답하기 전에 표시하지 않습니다. 주가와 수익률도 보여주지 않습니다.</p>
+<details><summary>선택 방법과 예시 보기</summary>
+<p><b>무엇에 관한 설명인가요?</b> 회사의 제품·실적·활동이면 ‘회사’, 업종 전체의 상황이면 ‘산업 전체’입니다. 둘이 함께 있으면 ‘둘 다’, 문장과 주변 내용을 읽어도 주체를 특정할 수 없으면 ‘주체 불명확’을 선택합니다.</p>
+<p><b>어느 시점에 관한 설명인가요?</b> 과거에 한 일이나 현재 상태·운영 활동이면 ‘과거·현재’, 앞으로 할 일이나 예상·계획이면 ‘미래’, 두 내용이 함께 있으면 ‘둘 다’입니다. 문장에서 시점을 특정할 수 없으면 ‘시점 불명확’입니다.</p>
+<ul><li>‘회사는 지난해 매출이 증가했습니다.’ → 회사 / 과거·현재</li>
+<li>‘자동차 산업은 내년 수요 증가가 예상됩니다.’ → 산업 전체 / 미래</li>
+<li>‘회사는 현금 흐름을 예측하며 자금을 관리하고 있습니다.’ → 회사 / 과거·현재의 운영 활동</li></ul>
+<p>‘과거·현재’를 골라도 회사 설명의 진실성을 보증하는 것은 아닙니다. 제목에 ‘계획’이 있거나 문장에 ‘기대’가 있다는 이유만으로 미래를 고르지 마세요. 주변 문단을 참고하되 강조된 문장을 판단합니다.</p>
+<p>내용이 어렵거나 주변 문단으로도 판단이 어려우면 <b>이 문장은 판단하기 어렵습니다</b>를 선택하세요. ‘주체/시점 불명확’이라는 판단 자체가 가능한 경우와 구별합니다. 전문 지식을 공부해서 답을 만들 필요는 없습니다.</p>
+</details>
+<p class="note">처음에는 몇 문장만 해도 됩니다. 답한 내용은 이 브라우저에 임시 보관을 시도하지만, 확실히 보관하려면 아래의 <b>답안 파일 저장</b>을 누르세요. 인터넷으로 답을 전송하지 않습니다.</p>
+<p id="progress" aria-live="polite"></p>
+<div class="bar"><button id="prev" type="button">이전 문장</button><span id="number"></span><button id="next" type="button">다음 문장</button></div>
+<section aria-labelledby="title"><h2 id="title"></h2><p id="path" class="small"></p><blockquote id="quote"></blockquote>
+<details id="surrounding"><summary>앞뒤 문단 보기</summary><pre id="context"></pre><p class="small">강조된 문장만 판단합니다. 긴 문단의 앞뒤는 일부만 표시할 수 있습니다.</p></details>
+<label for="subject">1. 무엇에 관한 설명인가요?</label>
+<select id="subject"><option value="">선택해주세요</option><option value="company">이 회사의 실적·제품·활동</option><option value="industry">산업 전체의 상황</option><option value="mixed">회사와 산업 둘 다</option><option value="unclear">주체가 불명확함</option></select>
+<label for="time">2. 어느 시점에 관한 설명인가요?</label>
+<select id="time"><option value="">선택해주세요</option><option value="reported">과거·현재의 상태나 활동</option><option value="outlook">미래 전망·계획</option><option value="mixed">과거·현재와 미래 둘 다</option><option value="unclear">시점이 불명확함</option></select>
+<label><input id="abstain" type="checkbox"> 이 문장은 판단하기 어렵습니다</label>
+<label for="note">메모 (선택)</label><textarea id="note" maxlength="500" rows="2" placeholder="어려운 부분이나 선택 이유를 남겨도 됩니다."></textarea>
+<p id="status" role="status"></p></section>
+<hr><label id="attest-label"><input id="attest" type="checkbox"> 제가 문장을 읽고 직접 선택한 답입니다. 모르는 문장은 판단하기 어렵다고 표시했습니다.</label>
+<div class="bar"><button id="save" type="button" disabled>답안 파일 저장</button><label>저장한 답안 이어하기 <input id="restore" type="file" accept=".json,application/json"></label></div>
+<p id="save-status" aria-live="polite"></p>
+<p>저장한 뒤 <b>TEXT_CHECK.cmd</b>를 다시 실행하면 검토 결과를 엽니다. 답안은 보통 PC의 다운로드 폴더에 있습니다. 파일을 찾지 못하면 저장한 JSON 파일을 TEXT_CHECK.cmd 위에 끌어다 놓으세요.</p>
+<p class="small">이 소수 문장의 1인 검토 결과는 전체 분류 정확도를 보장하지 않습니다. 기존 모델·예측 기록을 바꾸거나 매매하지 않습니다.</p>
+<script id="review-data" type="application/json">__REVIEW_DATA__</script>
+<script>
+'use strict';
+const data=JSON.parse(document.getElementById('review-data').textContent);
+const $=id=>document.getElementById(id);
+const allowed={subject:['company','industry','mixed','unclear'],time:['reported','outlook','mixed','unclear']};
+const key='Lyupang:text-review:'+data.pack_hash;
+let index=0, answers=Object.create(null);
+const notice=message=>{$('save-status').textContent=message;};
+function validRecords(file){
+  if(file.schema_version!==1||file.pack_id!==data.pack_id||file.pack_hash!==data.pack_hash||file.rubric!==data.rubric||file.annotation_source!=='human_entered'||file.reviewer_attestation!==true||!Array.isArray(file.answers)||file.answers.length<1||file.answers.length>data.items.length)throw Error('different pack');
+  const next=Object.create(null);
+  for(const row of file.answers){
+    const item=data.items.find(item=>item.id===row.id);
+    if(!item||next[row.id]||row.text_sha256!==item.text_sha256||typeof row.note!=='string'||row.note.length>500)throw Error('invalid answer');
+    if(row.state==='answered'){
+      if(!allowed.subject.includes(row.subject)||!allowed.time.includes(row.time_orientation))throw Error('invalid choice');
+    }else if(row.state!=='abstain'||row.subject!==null||row.time_orientation!==null)throw Error('invalid state');
+    next[row.id]={...row};
+  }
+  return next;
+}
+function fileData(){return {schema_version:1,pack_id:data.pack_id,pack_hash:data.pack_hash,rubric:data.rubric,annotation_source:'human_entered',reviewer_attestation:true,saved_at:new Date().toISOString(),answers:data.items.map(item=>answers[item.id]).filter(Boolean)};}
+function cache(){
+  try{localStorage.setItem(key,JSON.stringify(fileData()));}catch{notice('브라우저 임시 보관을 사용할 수 없습니다. 답안 파일 저장으로 보관하세요.');}
+}
+function updateProgress(){
+  const values=Object.values(answers), done=values.filter(row=>row.state==='answered').length;
+  $('progress').textContent=`전체 ${data.items.length}문장 · 답변 ${done} · 판단 유보 ${values.length-done} · 미답변 ${data.items.length-values.length}`;
+  $('save').disabled=!$('attest').checked||!values.length;
+}
+function render(){
+  const item=data.items[index], row=answers[item.id];
+  $('number').textContent=`${index+1} / ${data.items.length}`;
+  $('title').textContent=`${item.company_name} · 확인할 문장`;
+  $('path').textContent=item.headings.join(' / ');
+  $('quote').textContent=item.text;
+  $('context').textContent=item.context;
+  $('surrounding').open=false;
+  $('subject').value=row?.subject||'';
+  $('time').value=row?.time_orientation||'';
+  $('note').value=row?.note||'';
+  $('abstain').checked=row?.state==='abstain';
+  $('subject').disabled=$('time').disabled=$('abstain').checked;
+  $('prev').disabled=index===0;$('next').disabled=index===data.items.length-1;
+  $('status').textContent=row?(row.state==='abstain'?'판단을 유보했습니다.':'선택을 기록했습니다.'):'아직 답하지 않았습니다.';
+  updateProgress();
+}
+function capture(){
+  const item=data.items[index], subject=$('subject').value, orientation=$('time').value, abstain=$('abstain').checked;
+  $('subject').disabled=$('time').disabled=abstain;
+  if(abstain||(subject&&orientation)){
+    answers[item.id]={id:item.id,text_sha256:item.text_sha256,state:abstain?'abstain':'answered',subject:abstain?null:subject,time_orientation:abstain?null:orientation,note:$('note').value};
+    $('status').textContent=abstain?'판단을 유보했습니다.':'선택을 기록했습니다.';
+  }else{
+    delete answers[item.id];$('status').textContent='두 항목을 모두 선택하거나 판단하기 어렵다고 표시해주세요.';
+  }
+  cache();updateProgress();
+}
+for(const name of ['subject','time','abstain','note'])$(name).addEventListener('change',capture);
+$('note').addEventListener('input',capture);
+$('attest').addEventListener('change',updateProgress);
+$('prev').addEventListener('click',()=>{index--;render();});
+$('next').addEventListener('click',()=>{index++;render();});
+$('save').addEventListener('click',()=>{
+  if($('save').disabled)return;
+  const blob=new Blob([JSON.stringify(fileData(),null,2)],{type:'application/json;charset=utf-8'}), url=URL.createObjectURL(blob);
+  const link=document.createElement('a');link.href=url;link.download='Lyupang-text-labels-'+data.pack_id+'.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  notice('답안 파일 다운로드를 요청했습니다. 다운로드가 끝나면 TEXT_CHECK.cmd를 다시 실행하세요.');
+});
+$('restore').addEventListener('change',async()=>{
+  try{const file=$('restore').files[0];if(!file||file.size>2000000)throw Error('size');const loaded=validRecords(JSON.parse(await file.text()));answers=loaded;cache();render();notice('저장한 답안을 불러왔습니다. 수정 후 다시 저장할 수 있습니다.');}
+  catch{notice('같은 검토 묶음에서 저장한 올바른 답안 파일인지 확인해주세요.');}
+  $('restore').value='';
+});
+try{const saved=localStorage.getItem(key);if(saved){const parsed=JSON.parse(saved);if(parsed.answers?.length)answers=validRecords(parsed);}}catch{notice('임시 보관을 읽지 못했습니다. 저장한 답안 파일을 불러올 수 있습니다.');}
+render();
+</script>
+</html>

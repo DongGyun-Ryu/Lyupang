@@ -13,5 +13,6 @@ forward/
 business/
 business_documents/
 context/
+text_validation/
 .env
 *.log
