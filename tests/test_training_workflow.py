@@ -92,6 +92,17 @@ class TrainingWorkflowTests(unittest.TestCase):
         self.assertIn("재무 원문 연결", models["reason"])
         self.assertNotIn("PRIVATE", summary["stocks"][0]["error"])
 
+    def test_review_failure_does_not_claim_the_saved_training_failed(self):
+        from contextlib import redirect_stderr
+        output = io.StringIO()
+        with patch.object(train, "stored_key", return_value="a" * 40), patch.object(train, "DartClient", return_value=self.dart), patch("review.run", side_effect=RuntimeError("PRIVATE")), redirect_stdout(io.StringIO()), redirect_stderr(output):
+            status = train.main(["--root", str(self.root), "--no-open"])
+        self.assertEqual(status, 2)
+        self.assertIn("학습 결과는 저장됐지만", output.getvalue())
+        self.assertNotIn("PRIVATE", output.getvalue())
+        folder, = list((self.root / "learning").iterdir())
+        self.assertEqual(json.loads((folder / "models.json").read_text())["status"], "trained")
+
 
 if __name__ == "__main__":
     unittest.main()

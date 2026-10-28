@@ -159,15 +159,29 @@ def main(argv=None):
             raise CollectionError("기존 DART 키를 찾지 못했습니다. DART_SETUP.cmd로 확인해주세요.")
         source = args.input or latest_research(args.root / "research")
         target, summary, models = run(source, args.root / "learning", args.root / "financial_documents", DartClient(key))
+        report_to_open = target / "report.html"
         print(f"\n재무 원문 연결: {sum(s['usable_rows'] for s in summary['stocks'])}/{summary['source_rows']}사례")
         labels = {"trained": "연구용 모델 학습·평가 완료", "partial": "일부 모델 학습 완료", "blocked": "조건 미충족으로 학습 대기"}
         print(labels[models["status"]])
         if any(s.get("error") or s.get("warning") for s in summary["stocks"]):
             print("읽지 못한 원문 또는 제외된 종목이 있습니다. 보고서의 확인할 내용을 봐주세요.")
         print(f"결과 보고서: {target / 'report.html'}")
+        if any(m.get("status") == "trained" for m in models["models"].values()):
+            from review import run as review_run
+            try:
+                review_path, diagnosis = review_run(target, args.root / "diagnostics", args.root / "evaluation_registry")
+            except Exception:
+                print("학습 결과는 저장됐지만 성능 진단을 완료하지 못했습니다. REVIEW.cmd로 확인해주세요.", file=sys.stderr)
+                return 2
+            for horizon, checked in diagnosis["models"].items():
+                state = "탈락" if checked["disposition"] == "rejected" else "보류"
+                print(f"성능 진단 {horizon}거래일: {state}")
+            print("자동 채택 모델: 0개 · 새 기간 검증 전에는 채택하지 않습니다.")
+            print(f"진단 보고서: {review_path / 'report.html'}")
+            report_to_open = review_path / "report.html"
         print("실제 주문 기능은 연결하지 않았습니다.")
         if sys.platform == "win32" and not args.no_open:
-            webbrowser.open((target / "report.html").resolve().as_uri())
+            webbrowser.open(report_to_open.resolve().as_uri())
         return 0 if models["status"] == "trained" and not any(s.get("error") for s in summary["stocks"]) else 2
     except CollectionError as exc:
         print(f"학습 준비 실패: {exc}", file=sys.stderr)

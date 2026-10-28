@@ -7,5 +7,7 @@ data/
 research/
 learning/
 financial_documents/
+diagnostics/
+evaluation_registry/
 .env
 *.log

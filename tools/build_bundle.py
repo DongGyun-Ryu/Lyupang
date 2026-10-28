@@ -6,11 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
-         "learning.py", "TRAIN.cmd")
+         "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.3.1.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.4.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -18,7 +18,15 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 재무 원문 연결과 첫 연구용 학습 0.3.1
+        guide = """Lyupang 학습 결과 성능 진단 0.4.0
+
+이미 학습을 마친 경우:
+REVIEW.cmd를 실행합니다. 저장된 최신 모델과 평가 자료만 읽어 진단합니다.
+재학습·키움/DART 조회·인증키 입력 없이 종목별·분기별 성능을 확인합니다.
+기준보다 못한 모델은 탈락, 개선돼도 새로운 검증 전에는 보류합니다.
+어떤 모델도 자동으로 실전 승인하지 않으며 실제 주문은 실행하지 않습니다.
+진단 결과는 %LOCALAPPDATA%\\Lyupang\\diagnostics에 저장됩니다.
+열람한 평가 기간은 evaluation_registry에 기록하며 새로운 미사용 검증으로 주장하지 않습니다.
 
 1. ZIP 파일을 '모두 추출'합니다.
 2. START.cmd를 실행합니다.
@@ -41,6 +49,7 @@ DART_SETUP.cmd를 실행해 그 창에 직접 입력하세요. 채팅에 보내�
 TRAIN.cmd를 실행합니다. 저장한 최신 연구 결과와 기존 DART 키를 재사용합니다.
 접수번호별 연간 재무 원문을 확인하고 당시 공개된 정보만 사례에 연결합니다.
 조건을 만족하면 학습·검증·최종 평가 기간을 나눠 연구용 모델을 학습합니다.
+학습 후 성능 진단도 자동 실행하고 판정 결과를 별도 보고서에 표시합니다.
 원문을 해석하지 못하거나 표본이 부족하면 학습 대기 이유를 보고서에 표시합니다.
 결과 보고서는 브라우저에서 열리고 %LOCALAPPDATA%\\Lyupang\\learning에 저장됩니다.
 처음에는 원문 다운로드에 시간이 걸립니다. 같은 원문은 해시를 확인해 재사용합니다.
@@ -54,7 +63,8 @@ TRAIN.cmd를 실행합니다. 저장한 최신 연구 결과와 기존 DART 키�
 계정 이름 보정은 START.cmd가 자동으로 적용합니다.
 이 버전은 연구용 학습까지 수행할 수 있습니다. 실제 주문은 실행하지 않습니다.
 기존 3종목 가격·DART 수집은 사용자 PC에서 검증됐습니다.
-새 원문 해석·학습 기능의 실제 결과는 PC 실행 후 확인해야 합니다.
+기존 0.3.1 원문 해석·학습은 사용자 PC에서 성공했습니다.
+새 진단 기능의 실제 결과는 PC 실행 후 확인해야 합니다.
 
 상세한 기능과 데이터 한계는 README.md에 있습니다.
 """
