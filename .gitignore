@@ -12,5 +12,6 @@ evaluation_registry/
 forward/
 business/
 business_documents/
+context/
 .env
 *.log

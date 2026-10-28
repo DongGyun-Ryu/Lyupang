@@ -1,7 +1,7 @@
 [project]
 name = "lyupang"
-version = "0.6.2"
-description = "사업보고서 사업·실적 설명의 출처별 수집"
+version = "0.7.0"
+description = "사업보고서 문장 구분과 공개 이후 가격 연결"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 

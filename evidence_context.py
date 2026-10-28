@@ -1,0 +1,163 @@
+"""Transparent text candidates and receipt-level price observations, never trading signals."""
+from __future__ import annotations
+
+import hashlib
+import re
+from datetime import datetime, time, timedelta
+
+from lyupang import CollectionError, SEOUL, parse_date
+from research_data import HORIZONS
+
+POLICY = "sentence_context_rules_v1"
+COMPANY = re.compile(r"당사|우리\s*회사|연결\s*기준|별도\s*기준")
+INDUSTRY = re.compile(r"시장은|시장이|시장의|시장\s*(?:규모|수요|성장)|(?:글로벌|세계|전체|국내)\s*.{0,15}시장|산업은|산업이|업계")
+OUTLOOK = re.compile(r"전망|예상|예측|계획|목표|예정|기대|추정|추진|추구|확대할|것으로\s*보")
+REPORTED = re.compile(r"하였습니다|했습니다|되었습니다|됐습니다|하였으며|했으며|되었으며|기록했|기록하였|달성했|달성하였|집계되었")
+PERFORMANCE = re.compile(r"매출|영업이익|순이익|영업손실|판매량|수익성|영업실적|거래액|실적")
+RISK = re.compile(r"위험|리스크|불확실|우려|손실\s*가능|경쟁\s*심화|환율\s*변동")
+COMPANY_HEADINGS = re.compile(r"매출및수주|주요제품|제품및서비스|재무상태및영업실적|영업실적")
+SENTENCE_END = re.compile(r'''(?:[다요음함][.!?。]|[!?。])["'”’)\]]*''')
+
+
+def sentence_spans(text):
+    """Conservative Korean endings; preserve exact offsets and decimal numbers."""
+    start = 0
+    ends = [match.end() for match in SENTENCE_END.finditer(text)] + [len(text)]
+    for end in ends:
+        left, right = start, end
+        while left < right and text[left].isspace():
+            left += 1
+        while right > left and text[right - 1].isspace():
+            right -= 1
+        if left < right:
+            yield left, right
+        start = end
+
+
+def classify(text, headings, company_name):
+    """No prices or future outcomes are accepted by the classifier."""
+    matches = {}
+    for name, pattern in (("company", COMPANY), ("industry", INDUSTRY), ("outlook", OUTLOOK),
+                          ("reported", REPORTED), ("performance", PERFORMANCE), ("risk", RISK)):
+        found = [{"start": m.start(), "end": m.end(), "text": m.group()} for m in pattern.finditer(text)]
+        if found:
+            matches[name] = found
+    aliases = [company_name]
+    if company_name in {"NAVER", "네이버"}:
+        aliases = ["NAVER", "네이버"]
+    for alias in aliases:
+        if len(alias) >= 2:
+            for match in re.finditer(re.escape(alias), text, re.I):
+                matches.setdefault("company", []).append({"start": match.start(), "end": match.end(), "text": match.group()})
+    company, industry = bool(matches.get("company")), bool(matches.get("industry"))
+    heading_fallback = False
+    if not company and not industry and matches.get("performance"):
+        heading_fallback = bool(COMPANY_HEADINGS.search(re.sub(r"\s+", "", " / ".join(headings))))
+        company = heading_fallback
+    subject = "mixed" if company and industry else "company" if company else "industry" if industry else "unclear"
+    outlook = bool(matches.get("outlook"))
+    reported = bool(matches.get("reported"))
+    # Static numeric performance is a reported-value candidate only without a
+    # forward-looking cue. A year or '전년 대비' alone never proves realization.
+    numeric_present = bool(matches.get("performance") and re.search(r"[0-9]", text) and re.search(r"입니다|기록입니다", text))
+    if numeric_present and not outlook:
+        reported = True
+    orientation = "mixed" if outlook and reported else "outlook" if outlook else "reported" if reported else "unclear"
+    topics = [key for key in ("performance", "risk") if matches.get(key)] or ["business"]
+    review = subject in {"mixed", "unclear"} or orientation in {"mixed", "unclear"} or len(text) > 2000
+    return {"subject": subject, "time_orientation": orientation, "topics": topics,
+            "status": "needs_review" if review else "rule_based_candidate", "matched_expressions": matches,
+            "company_heading_fallback": heading_fallback, "method": POLICY,
+            "externally_verified": False, "causal_claim_verified": False}
+
+
+def annotate(blocks, event, code, company_name):
+    received = parse_date(event["receipt_date"])
+    expected = (received + timedelta(days=1)).isoformat() + "T00:00:00+09:00"
+    if event["available_from"] != expected:
+        raise CollectionError("문서의 접수일과 사용 가능 시각이 일치하지 않습니다.")
+    statements, skipped_tables = [], 0
+    for block in blocks:
+        path = re.sub(r"\s+", "", " / ".join(block["headings"]))
+        if not any(word in path for word in ("사업의내용", "사업개요", "사업의개요", "경영진단", "영업실적", "경영성과")):
+            continue
+        if block["kind"] == "table":
+            skipped_tables += 1
+            continue
+        if block["kind"] != "paragraph":
+            continue
+        for index, (start, end) in enumerate(sentence_spans(block["text"]), 1):
+            text = block["text"][start:end]
+            if len(text) < 8:
+                continue
+            statement = {"id": f"{code}_{event['receipt_no']}_{block['id']}_{index}",
+                "release_id": f"{code}_{event['receipt_no']}", "code": code, "receipt_no": event["receipt_no"],
+                "receipt_date": event["receipt_date"], "available_from": expected, "period_end": event["period_end"],
+                "block_id": block["id"], "block_sha256": block["text_sha256"], "start": start, "end": end,
+                "text": text, "text_sha256": hashlib.sha256(text.encode()).hexdigest(), "headings": block["headings"],
+                "classification": classify(text, block["headings"], company_name)}
+            statements.append(statement)
+            if len(statements) > 50_000:
+                raise CollectionError("문서당 문장 수가 지원 범위를 넘었습니다.")
+    return statements, skipped_tables
+
+
+def release_outcomes(event, code, metadata, bars, reference_date):
+    """One row per receipt/horizon, not per sentence. No same-day receipt prices."""
+    received = parse_date(event["receipt_date"])
+    available_day = received + timedelta(days=1)
+    if event["available_from"] != available_day.isoformat() + "T00:00:00+09:00":
+        raise CollectionError("가격 연결 대상의 공개 시점이 올바르지 않습니다.")
+    if (metadata.get("code") != code or metadata.get("adjusted") is not True
+            or metadata.get("adjustment_base_date") != metadata.get("requested_end")):
+        raise CollectionError("가격 자료의 종목 또는 수정주가 기준이 일치하지 않습니다.")
+    if ([b.date for b in bars] != sorted({b.date for b in bars}) or any(b.code != code for b in bars)):
+        raise CollectionError("가격 연결에는 같은 종목의 정렬된 일봉이 필요합니다.")
+    coverage_start, coverage_end = parse_date(metadata["requested_start"]), parse_date(metadata["requested_end"])
+    reference = parse_date(reference_date)
+    eligible = [b for b in bars if available_day.isoformat() <= b.date <= min(coverage_end, reference).isoformat()]
+    outcomes = []
+    for horizon in HORIZONS:
+        row = {"release_id": f"{code}_{event['receipt_no']}", "code": code, "receipt_no": event["receipt_no"],
+               "receipt_date": event["receipt_date"], "available_from": event["available_from"],
+               "period_end": event["period_end"], "horizon": horizon, "status": "pending", "reason": "later_bars_needed",
+               "entry_date": None, "exit_date": None, "entry_open": None, "exit_close": None, "price_change_pct": None,
+               "calendar_verified": False, "point_in_time_prices_verified": False, "strategy_return": False}
+        if available_day < coverage_start or not any(b.date < available_day.isoformat() for b in bars):
+            row.update(status="outside_coverage", reason="release_before_price_coverage")
+        elif available_day > reference or available_day > coverage_end:
+            row["reason"] = "release_not_available_within_reference"
+        elif len(eligible) >= horizon:
+            selected = eligible[:horizon]
+            if any(b.open <= 0 or b.close <= 0 or b.zero_volume or b.volume_capped for b in selected):
+                row.update(status="quality_issue", reason="price_or_volume_quality")
+            else:
+                first, last = selected[0], selected[-1]
+                entry_time = datetime.combine(parse_date(first.date), time(9), SEOUL)
+                if entry_time < datetime.fromisoformat(event["available_from"]):
+                    raise CollectionError("문서가 사용 가능해지기 전의 가격에 연결됐습니다.")
+                row.update(status="observed", reason="first_observed_session_after_availability",
+                           entry_date=first.date, exit_date=last.date, entry_open=first.open, exit_close=last.close,
+                           price_change_pct=(last.close / first.open - 1) * 100,
+                           days_until_first_observed_session=(parse_date(first.date) - available_day).days)
+        outcomes.append(row)
+    return outcomes
+
+
+def mark_overlaps(outcomes):
+    for row in outcomes:
+        row["same_day_receipts"] = sorted({other["receipt_no"] for other in outcomes
+            if other["code"] == row["code"] and other["available_from"] == row["available_from"]})
+        row["overlaps_other_receipt"] = any(other["code"] == row["code"] and other["horizon"] == row["horizon"]
+            and other["receipt_no"] != row["receipt_no"] and other["status"] == row["status"] == "observed"
+            and other["entry_date"] <= row["exit_date"] and row["entry_date"] <= other["exit_date"] for other in outcomes)
+
+
+def counts(statements):
+    classes = [s["classification"] for s in statements]
+    return {"sentences": len(classes),
+            "company_reported_performance": sum(c["subject"] == "company" and c["time_orientation"] == "reported"
+                                                and "performance" in c["topics"] for c in classes),
+            "industry": sum(c["subject"] == "industry" for c in classes),
+            "outlook_included": sum(c["time_orientation"] in {"outlook", "mixed"} for c in classes),
+            "needs_review": sum(c["status"] == "needs_review" for c in classes)}

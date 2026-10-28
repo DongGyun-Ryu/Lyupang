@@ -7,11 +7,11 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
-         "business.py", "business_text.py", "BUSINESS.cmd")
+         "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.6.2.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.7.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -19,7 +19,18 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 사업보고서 근거 모음 0.6.2
+        guide = """Lyupang 설명 구분과 공개 이후 가격 0.7.0
+
+사업보고서 14/14건 수집을 마친 경우:
+CONTEXT.cmd를 실행합니다. 최신 BUSINESS 결과와 그 출처의 기존 가격 자료를 읽습니다.
+새 다운로드·인증키 입력·재학습 없이 회사 실적, 산업 동향, 전망·계획 후보를 구분합니다.
+문장에 표현이 섞이거나 불명확하면 혼합·판단 보류로 남깁니다. 이는 실행 오류가 아닙니다.
+접수일 다음 날 이후 첫 관찰 일봉부터 5·20·60일봉 가격 변화를 보고서별로 연결합니다.
+가격 수집 시작 전 공시는 '가격 기간 밖'이며 뒤늦은 가격으로 대신 연결하지 않습니다.
+브라우저 보고서의 '문장 분류·가격 연결 상태'와 '확인할 내용'을 확인해주세요.
+결과는 %LOCALAPPDATA%\\Lyupang\\context에 새 폴더로 저장합니다.
+분류는 제목·표현 규칙에 따른 후보이며 의미를 이해한 학습 결과나 인과관계 검증이 아닙니다.
+과거 자료 비교입니다. 기존 OBSERVE 모델·예측은 바꾸거나 실제 주문하지 않습니다.
 
 이전 버전에서 본문 읽기 0/14건 또는 4/14건으로 나온 경우:
 새 폴더의 BUSINESS.cmd만 다시 실행하세요. 저장된 본문 ZIP은 해시 확인 후 재사용합니다.
