@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
+FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
@@ -12,7 +12,7 @@ FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", 
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.8.1.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.8.2.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -20,7 +20,18 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 문장 직접 검토 0.8.1
+        guide = """Lyupang 관찰 프로그램 Windows 출력 보완 0.8.2
+
+OBSERVE 실행 중 _readerthread / UnicodeDecodeError가 표시된 경우:
+윈도우 권한 확인 도구의 한글 출력과 파이썬 UTF-8 설정이 맞지 않던 부분을 보완했습니다.
+2026-10-29 사용자 실행 기록에서는 새 예측 6개·결과 대기 6개가 저장됐습니다.
+새 ZIP을 새 폴더에 모두 추출하세요.
+기존 검은 OBSERVE 창은 Ctrl+C로 종료하고, 새 폴더의 OBSERVE.cmd를 실행하세요.
+기존 고정 모델과 예측 기록을 이어가며 같은 날짜의 예측을 다시 만들지 않습니다.
+키 재등록·데이터 삭제·모델 재학습·관리자 권한 실행은 필요하지 않습니다.
+기존 UTF-8 파일 설정과 폴더 권한 확인 명령·실패 판정은 그대로 사용합니다.
+실제 주문은 실행하지 않습니다. 창과 PC가 켜져 있을 때 매일 오전 8시 30분에 확인합니다.
+브라우저 보고서만 열어두면 자동 실행되지 않습니다.
 
 이미 검토 결과가 있는 경우:
 새 폴더의 TEXT_CHECK.cmd를 실행하면 저장한 답으로 새 비교 보고서를 만듭니다.

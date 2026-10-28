@@ -125,6 +125,8 @@ class KiwoomSource:
                 from kiwoom import get_client
             except ImportError:
                 raise CollectionError("키움 도구가 있는 파이썬으로 실행해주세요. Windows에서는 START.cmd를 사용하세요.") from None
+            from sdk_compat import configure_windows_acl_capture
+            configure_windows_acl_capture()
             client = get_client(profile=profile, timeout_seconds=30)
         self._client = client
 
