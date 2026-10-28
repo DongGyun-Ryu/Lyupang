@@ -85,6 +85,13 @@ class TrainingWorkflowTests(unittest.TestCase):
         self.assertIn("연구용 모델 학습·평가 완료", output.getvalue())
         self.assertNotIn("a" * 40, output.getvalue())
 
+    def test_original_connection_failure_is_not_described_as_insufficient_price_dates(self):
+        self.dart.company_identifiers = Mock(side_effect=RuntimeError("PRIVATE"))
+        _, summary, models = train.run(self.input, self.root / "learning", self.root / "documents", self.dart, progress=lambda _: None)
+        self.assertEqual(models["status"], "blocked")
+        self.assertIn("재무 원문 연결", models["reason"])
+        self.assertNotIn("PRIVATE", summary["stocks"][0]["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

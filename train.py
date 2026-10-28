@@ -116,9 +116,12 @@ def run(input_folder: Path, output_root: Path, document_cache: Path, client, *, 
             progress(f"  원문 읽기 성공 {item['verified_reports']}/{item['reports']}건 · 재무 연결 {item['usable_rows']}/{item['rows']}사례")
         except Exception as exc:
             item["error"] = safe_reason(exc)
+            progress(f"  {code} 확인 필요: {item['error']}")
         summary["stocks"].append(item)
     progress("공개 시점 연결 결과로 학습·검증·최종 평가 구간을 분리하는 중...")
     models = train_models(features, outcomes, minimums=minimums)
+    if models["status"] == "blocked" and not features and any(s.get("error") for s in summary["stocks"]):
+        models["reason"] = "재무 원문 연결 단계가 중단되어 학습 입력을 만들지 못했습니다. 종목별 확인할 내용을 봐주세요."
     summary["model_status"] = models["status"]
     summary["rows"] = len(features)
     summary["source_rows"] = sum(s["rows"] for s in summary["stocks"])

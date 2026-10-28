@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import Mock
 
-from financial_history import FinancialError, document_bytes, financial_as_of, parse_original, report_period
+from financial_history import FinancialError, audit_reports, document_bytes, financial_as_of, parse_original, report_period
 
 
 def original(year=2023, *, assets=1000, liabilities=400, revenue=200, income=20, entity="00126380", currency="KRW", extra="", scope=None, segment=False):
@@ -99,6 +99,20 @@ class OriginalFinancialTests(unittest.TestCase):
         self.assertEqual(report_period("[기재정정]사업보고서 (2023.12)"), date(2023, 12, 31))
         with self.assertRaises(FinancialError):
             report_period("사업보고서 제출기한 연장신고서")
+
+    def test_nonannual_first_response_does_not_abort_valid_annual_original(self):
+        client = Mock()
+        client.company_identifiers.return_value = {"00126380"}
+        client.disclosures.return_value = [
+            {"receipt_no": "20220516000001", "receipt_date": "2022-05-16", "report_name": "분기보고서 (2022.03)"},
+            {"receipt_no": "20240301000001", "receipt_date": "2024-03-01", "report_name": "사업보고서 (2023.12)"},
+        ]
+        client.original_xbrl.return_value = original(2023)
+        with tempfile.TemporaryDirectory() as tmp:
+            events = audit_reports("005930", "00126380", date(2023, 10, 26), date(2026, 10, 26), client, Path(tmp), progress=lambda _: None)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["status"], "verified")
+        client.original_xbrl.assert_called_once_with("20240301000001")
 
 
 if __name__ == "__main__":

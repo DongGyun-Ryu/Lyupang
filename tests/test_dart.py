@@ -40,6 +40,17 @@ class DartTests(unittest.TestCase):
             self.assertEqual(query["last_reprt_at"], ["N"])
             self.assertEqual(query["crtfc_key"], [KEY])
 
+    def test_annual_query_filters_mixed_periodic_response_after_page_validation(self):
+        quarter = filing("20220516000001", "20220516", "분기보고서 (2022.03)")
+        annual = filing("20230301000001", "20230301", "사업보고서 (2022.12)")
+        half = filing("20230814000001", "20230814", "[기재정정]반기보고서 (2023.06)")
+        client, opener = client_with(page(1, [quarter, annual], total=3, pages=2), page(2, [half], total=3, pages=2))
+        records = client.disclosures(CORP, date(2022, 1, 1), date(2023, 12, 31), annual_only=True)
+        self.assertEqual([r["receipt_no"] for r in records], ["20230301000001"])
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(opener.open.call_args.args[0].full_url).query)
+        self.assertEqual(query["pblntf_detail_ty"], ["A001"])
+        self.assertNotIn("pblntf_ty", query)
+
     def test_missing_count_duplicate_or_changed_company_fails(self):
         cases = [page(1, [filing()], total=2, pages=1),
                  page(1, [filing(), filing()], total=2, pages=1),

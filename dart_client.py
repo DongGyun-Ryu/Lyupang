@@ -28,6 +28,11 @@ class DartError(CollectionError):
         self.code = code
 
 
+def is_annual_report(name) -> bool:
+    """Classify returned titles too; a query filter alone is not a response guarantee."""
+    return isinstance(name, str) and re.match(r"^(?:\[[^\]]+\]\s*)*사업보고서(?:[\s(（]|$)", name.strip()) is not None
+
+
 def stored_key() -> str | None:
     if os.environ.get("DART_API_KEY"):
         return os.environ["DART_API_KEY"]
@@ -61,7 +66,7 @@ class DartClient:
                 self._sleep(remaining)
         self._last_request = self._clock()
         query = urllib.parse.urlencode({**params, "crtfc_key": self._key})
-        request = urllib.request.Request(BASE + path + "?" + query, headers={"User-Agent": "Lyupang/0.3.0"})
+        request = urllib.request.Request(BASE + path + "?" + query, headers={"User-Agent": "Lyupang/0.3.1"})
         try:
             with self._opener.open(request, timeout=30) as response:
                 payload = response.read(LIMIT + 1)
@@ -141,7 +146,7 @@ class DartClient:
                 "end_de": end.strftime("%Y%m%d"), "last_reprt_at": "N", "sort": "date", "sort_mth": "asc",
                 "page_count": 100, "page_no": page}
             if annual_only:
-                params.update(pblntf_ty="A", pblntf_detail_ty="A001")
+                params["pblntf_detail_ty"] = "A001"
             data = self._json("list.json", params)
             if data["status"] == "013":
                 if page != 1:
@@ -179,7 +184,8 @@ class DartClient:
             if page == pages:
                 if len(records) != total:
                     raise DartError("DART 공시 건수가 페이지 기록과 일치하지 않습니다.")
-                return sorted(records, key=lambda r: (r["receipt_date"], r["receipt_no"]))
+                ordered = sorted(records, key=lambda r: (r["receipt_date"], r["receipt_no"]))
+                return [record for record in ordered if is_annual_report(record["report_name"])] if annual_only else ordered
         raise DartError("DART 공시 최대 조회 횟수에 도달했습니다.")
 
     def company_identifiers(self, corp: str, code: str) -> set[str]:

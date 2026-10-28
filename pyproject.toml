@@ -1,6 +1,6 @@
 [project]
 name = "lyupang"
-version = "0.3.0"
+version = "0.3.1"
 description = "공개 시점별 재무 원문 연결과 연구용 시계열 학습"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]

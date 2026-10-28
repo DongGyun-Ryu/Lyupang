@@ -10,7 +10,7 @@ FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", 
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.3.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.3.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -18,7 +18,7 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 재무 원문 연결과 첫 연구용 학습 0.3.0
+        guide = """Lyupang 재무 원문 연결과 첫 연구용 학습 0.3.1
 
 1. ZIP 파일을 '모두 추출'합니다.
 2. START.cmd를 실행합니다.

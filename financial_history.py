@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from lyupang import CollectionError, SEOUL, parse_date
-from dart_client import DartError
+from dart_client import DartError, is_annual_report
 
 XBRLI = "http://www.xbrl.org/2003/instance"
 XBRLDI = "http://xbrl.org/2006/xbrldi"
@@ -209,11 +209,16 @@ def document_bytes(cache: Path, code: str, receipt: str, client) -> tuple[bytes,
 def audit_reports(code: str, corp: str, start: date, end: date, client, cache: Path, *, progress=print) -> list[dict]:
     identifiers = client.company_identifiers(corp, code)
     records = client.disclosures(corp, start - timedelta(days=550), end, annual_only=True)
+    annual_records = [record for record in records if is_annual_report(record.get("report_name"))]
+    if len(records) != len(annual_records):
+        progress(f"  {code} 분기·반기 등 연간 대상이 아닌 보고서 {len(records) - len(annual_records)}건 제외")
+    records = annual_records
     if len(records) > 30:
         raise FinancialError("종목당 연간 원문 30건 한도를 넘었습니다. 기간을 줄여주세요.")
     audited = []
     for index, filing in enumerate(records, 1):
-        progress(f"  {code} 연간 원문 {index}/{len(records)} · 접수일 {filing['receipt_date']}")
+        title = "".join(c if c.isprintable() else " " for c in filing["report_name"])[:120]
+        progress(f"  {code} 연간 원문 {index}/{len(records)} · 접수일 {filing['receipt_date']} · {title}")
         period = report_period(filing["report_name"])
         received = parse_date(filing["receipt_date"])
         if period >= received or not start - timedelta(days=550) <= received <= end:
