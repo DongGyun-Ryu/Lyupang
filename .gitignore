@@ -10,5 +10,7 @@ financial_documents/
 diagnostics/
 evaluation_registry/
 forward/
+business/
+business_documents/
 .env
 *.log

@@ -18,7 +18,7 @@ from lyupang import CollectionError
 SERVICE = "Lyupang/OpenDART"
 KEY_NAME = "api_key"
 BASE = "https://opendart.fss.or.kr/api/"
-PATHS = {"corpCode.xml", "list.json", "fnlttSinglAcntAll.json", "company.json", "fnlttXbrl.xml"}
+PATHS = {"corpCode.xml", "list.json", "fnlttSinglAcntAll.json", "company.json", "fnlttXbrl.xml", "document.xml"}
 LIMIT = 20 * 1024 * 1024
 
 
@@ -207,6 +207,19 @@ class DartClient:
             except ET.ParseError:
                 pass
             raise DartError("해당 접수번호의 XBRL 원본 압축 파일이 제공되지 않았습니다.")
+        return payload
+
+    def original_document(self, receipt: str) -> bytes:
+        if not re.fullmatch(r"[0-9]{14}", receipt):
+            raise DartError("사업보고서 접수번호가 올바르지 않습니다.")
+        payload = self._download("document.xml", {"rcept_no": receipt})
+        if not zipfile.is_zipfile(io.BytesIO(payload)):
+            try:
+                root = ET.fromstring(payload)
+                self._status(root.findtext("status"))
+            except ET.ParseError:
+                pass
+            raise DartError("해당 접수번호의 보고서 본문 압축 파일이 제공되지 않았습니다.")
         return payload
 
     def annual_accounts(self, corp: str, year: int) -> dict:

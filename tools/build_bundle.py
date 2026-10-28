@@ -6,11 +6,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", "research.py", "research_data.py",
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
-         "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd")
+         "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
+         "business.py", "business_text.py", "BUSINESS.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.5.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.6.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -18,7 +19,18 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 새 예측 관찰 0.5.0
+        guide = """Lyupang 사업보고서 근거 모음 0.6.0
+
+새 사업보고서 설명 수집:
+BUSINESS.cmd를 실행합니다. 기존 DART 키와 연구 종목 목록을 사용합니다.
+사업 개요, 주요 제품·서비스, 실적 변화 설명과 위험요인을 원문 출처와 함께 모읍니다.
+발췌마다 접수일과 문단 위치, 전체 추출 본문을 확인할 수 있습니다.
+최신 원문을 읽지 못하면 이전 보고서의 설명으로 대신 채우지 않습니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\business의 새 폴더에 저장하고 브라우저로 엽니다.
+회사가 보고서에서 밝힌 설명의 발췌입니다. 주가 상승 원인 검증이나 본문 의미 학습은 아직 아닙니다.
+재학습·실제 주문·기존 예측 변경 없이 OBSERVE.cmd와 따로 실행할 수 있습니다.
+처음에는 본문 다운로드에 시간이 걸립니다. 다음에는 해시를 확인한 원문을 재사용합니다.
+새 본문 수집은 실제 PC에서 실행 후 '자료 수집 상태'와 '확인할 내용'을 확인해주세요.
 
 이미 학습과 진단을 마친 경우:
 OBSERVE.cmd를 실행합니다. 기존 모델을 고정하고 새 예측을 기록합니다.
@@ -77,7 +89,8 @@ TRAIN.cmd를 실행합니다. 저장한 최신 연구 결과와 기존 DART 키�
 기존 3종목 가격·DART 수집은 사용자 PC에서 검증됐습니다.
 기존 0.3.1 원문 해석·학습은 사용자 PC에서 성공했습니다.
 기존 0.4.0 진단도 사용자 PC에서 재계산이 확인됐습니다.
-새 예측 기록 기능의 실제 연결은 PC 실행 후 확인해야 합니다.
+0.5.0 모델 고정·대기 화면은 사용자 PC에서 확인됐습니다.
+첫 새 예측 저장·이후 결과 비교는 아직 확인 전입니다.
 
 상세한 기능과 데이터 한계는 README.md에 있습니다.
 """
