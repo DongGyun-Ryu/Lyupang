@@ -5,5 +5,7 @@ __pycache__/
 dist/
 data/
 research/
+learning/
+financial_documents/
 .env
 *.log

@@ -58,7 +58,7 @@ def render_report(batch: dict, outcomes: list[dict]) -> str:
 <p><code>future_outcomes.csv</code>: 이후 가격 변화입니다. 미래 결과이므로 예측 입력으로 사용하면 안 됩니다.</p>
 <p><code>dart/</code>: 공시 접수일·원문 링크와 최근 연간 재무제표 조회 기록입니다. 같은 날 공시는 계산에서 제외했고, 재무 수치는 과거 당시의 수치인지 확인하기 전까지 예측 입력에 넣지 않습니다.</p></section>
 <section><h2>아직 확인하지 않은 것</h2><p>상승 이유를 자동으로 설명하거나 인과관계를 입증한 결과가 아닙니다. 수정주가의 권리 반영 시점, 거래일 달력 누락, 상장폐지 종목, 현재 예시 종목의 선택 편향이 남아 있습니다. 겹치는 관찰 구간은 독립 표본이 아니며 학습·검증 분리 때 추가 처리가 필요합니다.</p>
-<p>사업 분석·뉴스 본문 분석·모델 학습·모의매매·실전 주문은 이후 단계입니다.</p></section></html>"""
+<p>첫 연구용 모델 학습은 TRAIN.cmd에서 원문 확인 후 별도로 실행할 수 있습니다. 사업·뉴스 본문 의미 분석, 모의매매·실전 주문은 이후 단계입니다.</p></section></html>"""
 
 
 def run_batch(codes, start, end, data_root: Path, report_root: Path, *, source_factory=KiwoomSource,

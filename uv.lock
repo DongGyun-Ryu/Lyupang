@@ -212,14 +212,18 @@ wheels = [
 
 [[package]]
 name = "lyupang"
-version = "0.2.0"
+version = "0.3.0"
 source = { virtual = "." }
 dependencies = [
     { name = "kwcli" },
+    { name = "numpy" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "kwcli", specifier = "==1.0.3" }]
+requires-dist = [
+    { name = "kwcli", specifier = "==1.0.3" },
+    { name = "numpy", specifier = "==2.5.4" },
+]
 
 [[package]]
 name = "more-itertools"

@@ -1,9 +1,9 @@
 [project]
 name = "lyupang"
-version = "0.2.0"
-description = "국내 주식 가격 사례와 OpenDART 재무·공시 자료 준비"
+version = "0.3.0"
+description = "공개 시점별 재무 원문 연결과 연구용 시계열 학습"
 requires-python = ">=3.13,<3.14"
-dependencies = ["kwcli==1.0.3"]
+dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 
 [tool.uv]
 package = false

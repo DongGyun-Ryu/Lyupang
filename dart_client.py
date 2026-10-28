@@ -18,12 +18,14 @@ from lyupang import CollectionError
 SERVICE = "Lyupang/OpenDART"
 KEY_NAME = "api_key"
 BASE = "https://opendart.fss.or.kr/api/"
-PATHS = {"corpCode.xml", "list.json", "fnlttSinglAcntAll.json", "company.json"}
+PATHS = {"corpCode.xml", "list.json", "fnlttSinglAcntAll.json", "company.json", "fnlttXbrl.xml"}
 LIMIT = 20 * 1024 * 1024
 
 
 class DartError(CollectionError):
-    pass
+    def __init__(self, message, *, code=None):
+        super().__init__(message)
+        self.code = code
 
 
 def stored_key() -> str | None:
@@ -59,14 +61,14 @@ class DartClient:
                 self._sleep(remaining)
         self._last_request = self._clock()
         query = urllib.parse.urlencode({**params, "crtfc_key": self._key})
-        request = urllib.request.Request(BASE + path + "?" + query, headers={"User-Agent": "Lyupang/0.2.0"})
+        request = urllib.request.Request(BASE + path + "?" + query, headers={"User-Agent": "Lyupang/0.3.0"})
         try:
             with self._opener.open(request, timeout=30) as response:
                 payload = response.read(LIMIT + 1)
         except urllib.error.HTTPError as exc:
-            raise DartError(f"DART 서버가 요청을 거절했습니다. HTTP {exc.code}.") from None
+            raise DartError(f"DART 서버가 요청을 거절했습니다. HTTP {exc.code}.", code=f"HTTP_{exc.code}") from None
         except (urllib.error.URLError, TimeoutError, OSError):
-            raise DartError("DART 서버에 접속하지 못했습니다.") from None
+            raise DartError("DART 서버에 접속하지 못했습니다.", code="network") from None
         if len(payload) > LIMIT:
             raise DartError("DART 응답이 처리 가능한 크기를 초과했습니다.")
         return payload
@@ -79,7 +81,7 @@ class DartClient:
                     "012": "DART에 등록된 접속 IP를 확인해주세요.", "020": "DART 요청 한도를 초과했습니다.",
                     "800": "DART 서버가 점검 중입니다.", "901": "DART 계정의 사용 가능 상태를 확인해주세요."}
         raise DartError(messages.get(value, "DART가 요청을 처리하지 못했습니다.") if isinstance(value, str)
-                        else "DART 응답의 상태 코드가 올바르지 않습니다.")
+                        else "DART 응답의 상태 코드가 올바르지 않습니다.", code=value if isinstance(value, str) else None)
 
     def _json(self, path: str, params: dict) -> dict:
         try:
@@ -131,13 +133,16 @@ class DartClient:
             raise DartError("DART 기업번호 XML 형식이 올바르지 않습니다.") from None
         return found
 
-    def disclosures(self, corp: str, start: date, end: date, *, max_pages: int = 100) -> list[dict]:
+    def disclosures(self, corp: str, start: date, end: date, *, max_pages: int = 100, annual_only=False) -> list[dict]:
         records, seen = [], set()
         expected_count, expected_pages = None, None
         for page in range(1, max_pages + 1):
-            data = self._json("list.json", {"corp_code": corp, "bgn_de": start.strftime("%Y%m%d"),
+            params = {"corp_code": corp, "bgn_de": start.strftime("%Y%m%d"),
                 "end_de": end.strftime("%Y%m%d"), "last_reprt_at": "N", "sort": "date", "sort_mth": "asc",
-                "page_count": 100, "page_no": page})
+                "page_count": 100, "page_no": page}
+            if annual_only:
+                params.update(pblntf_ty="A", pblntf_detail_ty="A001")
+            data = self._json("list.json", params)
             if data["status"] == "013":
                 if page != 1:
                     raise DartError("DART 연속조회 중 목록이 사라졌습니다.")
@@ -176,6 +181,27 @@ class DartClient:
                     raise DartError("DART 공시 건수가 페이지 기록과 일치하지 않습니다.")
                 return sorted(records, key=lambda r: (r["receipt_date"], r["receipt_no"]))
         raise DartError("DART 공시 최대 조회 횟수에 도달했습니다.")
+
+    def company_identifiers(self, corp: str, code: str) -> set[str]:
+        data = self._json("company.json", {"corp_code": corp})
+        if data.get("status") != "000" or data.get("corp_code") != corp or data.get("stock_code") != code:
+            raise DartError("원문 검증용 기업 식별번호를 확인하지 못했습니다.")
+        values = {re.sub(r"[^0-9]", "", str(data[key])) for key in ("corp_code", "stock_code", "bizr_no", "jurir_no")
+                  if data.get(key) and re.fullmatch(r"[0-9-]+", str(data[key]))}
+        return {value for value in values if value}
+
+    def original_xbrl(self, receipt: str) -> bytes:
+        if not re.fullmatch(r"[0-9]{14}", receipt):
+            raise DartError("재무제표 접수번호가 올바르지 않습니다.")
+        payload = self._download("fnlttXbrl.xml", {"rcept_no": receipt, "reprt_code": "11011"})
+        if not zipfile.is_zipfile(io.BytesIO(payload)):
+            try:
+                root = ET.fromstring(payload)
+                self._status(root.findtext("status"))
+            except ET.ParseError:
+                pass
+            raise DartError("해당 접수번호의 XBRL 원본 압축 파일이 제공되지 않았습니다.")
+        return payload
 
     def annual_accounts(self, corp: str, year: int) -> dict:
         fields = ("rcept_no", "reprt_code", "bsns_year", "sj_div", "account_id", "account_nm", "thstrm_nm",

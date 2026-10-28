@@ -77,6 +77,27 @@ class DartTests(unittest.TestCase):
         client, _ = client_with(raw.getvalue())
         self.assertEqual(client.companies(["005930"]), {"005930": {"corp_code": CORP, "corp_name": "삼성전자"}})
 
+    def test_company_identity_and_receipt_request_are_validated(self):
+        client, _ = client_with({"status": "000", "corp_code": CORP, "stock_code": "005930", "bizr_no": "124-81-00998", "jurir_no": "-"})
+        identifiers = client.company_identifiers(CORP, "005930")
+        self.assertIn("1248100998", identifiers)
+        self.assertNotIn("", identifiers)
+        raw = io.BytesIO()
+        with zipfile.ZipFile(raw, "w") as z:
+            z.writestr("report.xbrl", "<x/>")
+        client, opener = client_with(raw.getvalue())
+        self.assertEqual(client.original_xbrl("20250301000001"), raw.getvalue())
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(opener.open.call_args.args[0].full_url).query)
+        self.assertEqual(query["rcept_no"], ["20250301000001"])
+        self.assertEqual(query["reprt_code"], ["11011"])
+        with self.assertRaises(DartError):
+            client.original_xbrl("bad receipt")
+
+    def test_error_xml_is_not_treated_as_a_downloadable_original(self):
+        client, _ = client_with(b"<result><status>014</status><message>not found</message></result>")
+        with self.assertRaises(DartError):
+            client.original_xbrl("20250301000001")
+
     def test_financial_fallback_is_not_marked_as_point_in_time_input(self):
         row = {"corp_code": CORP, "rcept_no": "20260301000001", "bsns_year": "2025", "reprt_code": "11011",
                "account_id": "ifrs-full_Revenue", "thstrm_amount": "100,000"}
