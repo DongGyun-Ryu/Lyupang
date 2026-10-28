@@ -32,6 +32,71 @@ def prices():
 
 
 class ContextRulesTests(unittest.TestCase):
+    def test_accounting_and_management_terms_do_not_establish_a_forecast(self):
+        # Authored regression examples, not a held-out accuracy benchmark.
+        texts = [
+            "연결회사는 기대신용손실 모형으로 충당금을 설정하고 있습니다.",
+            "당사는 기대 신용 손실을 측정하였습니다.",
+            "당사는 회계추정의 변경을 반영하였습니다.",
+            "당사는 추정 내용연수와 추정 잔존가치를 검토합니다.",
+            "당사는 추정공정가치에 따라 자산을 측정합니다.",
+            "당사는 예상신용손실을 인식하였습니다.",
+            "당사는 자금수지 예측으로 유동성을 관리합니다.",
+            "당사는 현금 흐름 예측을 정기적으로 수행합니다.",
+            "계획 표준 생산 시간 대비 실제 가동시간을 계산합니다.",
+            "연결회사는 확정급여계획을 운영합니다.",
+            "당사는 퇴직 급여 계획을 운영합니다.",
+        ]
+        for text in texts:
+            with self.subTest(text=text):
+                result = classify(text, [], "삼성전자")
+                self.assertNotIn(result["time_orientation"], {"outlook", "mixed"})
+                self.assertNotIn("outlook", result["matched_expressions"])
+                self.assertTrue(result["excluded_expressions"])
+                self.assertEqual(result["status"], "needs_review")
+                self.assertIn("technical_term_requires_context", result["review_reasons"])
+                for cue in result["excluded_expressions"]:
+                    self.assertEqual(text[cue["start"]:cue["end"]], cue["text"])
+                    self.assertEqual(text[cue["context_start"]:cue["context_end"]], cue["context_text"])
+
+    def test_independent_forecasts_survive_a_technical_term_in_the_same_sentence(self):
+        texts = [
+            "당사는 기대신용손실 증가를 예상합니다.",
+            "당사는 회계추정 변경으로 내년 이익이 늘 것으로 전망합니다.",
+            "당사는 자금수지 예측 시스템을 확대할 계획입니다.",
+            "당사는 확정급여계획을 변경할 예정입니다.",
+        ]
+        for text in texts:
+            with self.subTest(text=text):
+                result = classify(text, [], "삼성전자")
+                self.assertEqual(result["time_orientation"], "outlook")
+                self.assertTrue(result["matched_expressions"]["outlook"])
+                self.assertTrue(result["excluded_expressions"])
+                self.assertEqual(result["status"], "needs_review")
+        for text in ("당사는 내년 매출 증가를 기대합니다.", "내년 당사 매출은 10조원으로 추정됩니다.",
+                     "당사는 생산설비를 확대할 계획입니다."):
+            result = classify(text, [], "삼성전자")
+            self.assertEqual(result["time_orientation"], "outlook")
+            self.assertEqual(result["excluded_expressions"], [])
+
+    def test_sales_destinations_and_company_actions_are_not_industry_subjects(self):
+        cases = [
+            ("당사는 국내시장에서 판매망을 확대하였습니다.", "company"),
+            ("국내시장에서는 판매대리점을 통해 제품을 공급합니다.", "unclear"),
+            ("글로벌 시장과 소통을 강화하였습니다.", "unclear"),
+            ("당사는 세계 IT업계에서 위상을 높이고 있습니다.", "company"),
+            ("아시아 시장을 중심으로 AI 프로젝트를 진행합니다.", "unclear"),
+            ("대표 시장의 판매가격을 평균하여 산정하였습니다.", "unclear"),
+            ("자동차 산업은 산업 연관 효과가 큽니다.", "industry"),
+            ("TV 업계는 신제품 경쟁을 하고 있습니다.", "industry"),
+            ("세계 반도체 시장은 성장하였습니다.", "industry"),
+            ("시장 규모가 확대될 것으로 예상합니다.", "industry"),
+            ("당사는 시장 수요가 증가할 것으로 예상합니다.", "mixed"),
+        ]
+        for text, subject in cases:
+            with self.subTest(text=text):
+                self.assertEqual(classify(text, [], "삼성전자")["subject"], subject)
+
     def test_company_industry_future_and_mixed_are_kept_distinct_with_rule_spans(self):
         cases = [
             ("당사의 매출은 전년 대비 10.9% 증가하였습니다.", "company", "reported"),
@@ -154,6 +219,10 @@ class ContextWorkflowTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256((target / "statements.jsonl").read_bytes()).hexdigest(), summary["statement_sha256"])
         self.assertFalse(summary["live_trading_allowed"])
         self.assertFalse(summary["fresh_unseen_evidence"])
+        self.assertEqual(summary["classification_policy"], "sentence_context_rules_v2")
+        report = (target / "report.html").read_text()
+        self.assertIn("용어 혼동 점검", report)
+        self.assertIn("정확도가 높아졌다고 판단하지 않습니다", report)
         self.assertEqual(original, {p: p.read_bytes() for p in original})
 
     def test_modified_text_hash_blocks_classification_without_inventing_replacement(self):

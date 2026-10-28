@@ -11,7 +11,7 @@ FILES = ("collect.py", "lyupang.py", "START.cmd", "OPEN_DATA.cmd", "README.md", 
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.7.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.7.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -19,7 +19,16 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 설명 구분과 공개 이후 가격 0.7.0
+        guide = """Lyupang 설명 구분과 공개 이후 가격 0.7.1
+
+0.7.0의 문장·가격 연결을 마친 경우:
+새 폴더의 CONTEXT.cmd만 다시 실행하세요. 기존 자료를 재사용합니다.
+'기대신용손실', '자금수지 예측' 등 용어를 미래 전망의 근거에서 제외하고 문장을 보류합니다.
+같은 문장에 별도의 전망·계획이 있으면 그 표현은 유지합니다.
+판매 지역이나 회사의 시장 진출만으로 산업 전체의 동향으로 분류하지 않습니다.
+보고서의 '용어 혼동 점검'과 각 문서의 '회계·관리 용어 확인'을 확인하세요.
+보류가 많아도 실행 오류는 아닙니다. 전체 문장의 분류 정확도를 검증한 단계는 아닙니다.
+기존 모델·OBSERVE 예측 기록·가격·사업보고서 파일은 변경하지 않습니다.
 
 사업보고서 14/14건 수집을 마친 경우:
 CONTEXT.cmd를 실행합니다. 최신 BUSINESS 결과와 그 출처의 기존 가격 자료를 읽습니다.

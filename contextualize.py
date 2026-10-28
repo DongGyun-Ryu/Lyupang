@@ -84,6 +84,7 @@ def render_report(summary, statements, outcomes):
                     "quality_issue": "가격 품질 확인", "source_error": "가격 파일 확인"}
     subject_names = {"company": "회사", "industry": "산업", "mixed": "혼합", "unclear": "판단 보류"}
     time_names = {"reported": "과거·현재 보고 표현", "outlook": "전망·계획", "mixed": "혼합", "unclear": "판단 보류"}
+    term_names = {"accounting_term": "회계 용어", "management_term": "관리·제도 용어"}
     table, sections = [], []
     for stock in summary["stocks"]:
         stats = stock["counts"]
@@ -91,7 +92,7 @@ def render_report(summary, statements, outcomes):
         observed = sum(r["status"] == "observed" for r in stock_prices)
         table.append(f"<tr><td>{esc(stock['code'])}</td><td>{stock['read_documents']} / {stock['target_documents']}</td>"
                      f"<td>{stats['sentences']}</td><td>{stats['company_reported_performance']}</td><td>{stats['industry']}</td>"
-                     f"<td>{stats['outlook_included']}</td><td>{stats['needs_review']}</td><td>{observed} / {len(stock_prices)}</td>"
+                     f"<td>{stats['outlook_included']}</td><td>{stats['needs_review']}</td><td>{stats['technical_term_review']}</td><td>{observed} / {len(stock_prices)}</td>"
                      f"<td>{esc(' / '.join(stock['errors']))}</td></tr>")
         documents = []
         for doc in stock["documents"]:
@@ -106,9 +107,10 @@ def render_report(summary, statements, outcomes):
                             f"<td>{esc(price.get('exit_date') or '—')}</td><td>{esc(result + flags)}</td></tr>")
             selected = [s for s in statements if s["release_id"] == doc["release_id"]]
             groups = (
-                ("회사 실적 · 보고 표현 후보", lambda c: c["subject"] == "company" and c["time_orientation"] == "reported" and "performance" in c["topics"]),
+                ("회사 실적 · 보고 표현 후보", lambda c: c["subject"] == "company" and c["time_orientation"] == "reported" and "performance" in c["topics"] and c["status"] == "rule_based_candidate"),
                 ("산업 동향 후보", lambda c: c["subject"] == "industry"),
                 ("전망·계획 포함", lambda c: c["time_orientation"] in {"outlook", "mixed"}),
+                ("회계·관리 용어 확인", lambda c: bool(c["excluded_expressions"])),
                 ("혼합·판단 보류 예시", lambda c: c["status"] == "needs_review"),
             )
             examples = []
@@ -121,11 +123,15 @@ def render_report(summary, statements, outcomes):
                     reasons = " / ".join(cue_texts[:10]) or "명확한 표현 부족"
                     if classification["company_heading_fallback"]:
                         reasons += " / 회사 실적 제목 문맥"
+                    excluded = " / ".join(sorted({f"{m['context_text']} ({term_names[m['reason']]})"
+                                                     for m in classification["excluded_expressions"]}))
+                    caution = (f"<br>전망 근거에서 제외: {esc(excluded)}. 다른 전망 표현은 별도로 확인하며 이 문장은 판단을 보류합니다."
+                               if excluded else "")
                     source_link = doc["source_html"] + "#" + statement["block_id"]
                     quotes.append(f"<article><p class='path'>{esc(' / '.join(statement['headings']))}</p>"
                                   f"<blockquote>{esc(statement['text'][:1500])}{' … (문장 일부)' if len(statement['text']) > 1500 else ''}</blockquote>"
                                   f"<p>{esc(subject_names[classification['subject']])} · {esc(time_names[classification['time_orientation']])}<br>"
-                                  f"분류에 사용한 표현: {esc(reasons)} · <a href='{esc(source_link)}'>원문 문단 보기</a></p></article>")
+                                  f"분류에 사용한 표현: {esc(reasons)}{caution} · <a href='{esc(source_link)}'>원문 문단 보기</a></p></article>")
                 examples.append(f"<h4>{esc(label)}</h4><p>{len(matches)}문장 중 원문 순서로 최대 4개 표시</p>{''.join(quotes)}")
             opened = " open" if doc["receipt_no"] == stock.get("selected_receipt_no") else ""
             documents.append(f"<details id='{esc(doc['release_id'])}'{opened}><summary>{esc(doc['report_name'])} · 접수일 {esc(doc['receipt_date'])}</summary>"
@@ -139,8 +145,10 @@ def render_report(summary, statements, outcomes):
 <title>Lyupang 설명 구분과 공개 이후 가격</title><style>body{{max-width:1200px;margin:35px auto;padding:0 20px;font-family:system-ui,sans-serif;line-height:1.8;color:#17263c}}table{{border-collapse:collapse;width:100%}}td,th{{padding:9px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}}blockquote{{white-space:pre-wrap;margin:10px 0;padding:15px;background:#f2f5f9}}details{{border:1px solid #d8dfe8;border-radius:8px;padding:15px;margin:20px 0}}summary{{cursor:pointer;font-weight:bold}}.note{{background:#fff2d5;padding:18px;border-radius:10px}}.path{{font-size:13px;color:#52647b}}</style>
 <h1>설명 구분과 공개 이후 가격</h1><p class='note'>회사 실적·산업 동향·전망을 표현 규칙으로 구분한 후보입니다. 뜻이 섞이거나 불명확하면 보류합니다. 보고서 공개 뒤의 가격을 연결해 관찰하며 주가 상승 원인을 입증하거나 매매 성적을 계산한 결과는 아닙니다.</p>
 <p>자료 기준일: {esc(summary['reference_date'])} · 처리 시각: {esc(summary['created_at'])}</p>
-<h2>문장 분류·가격 연결 상태</h2><table><tr><th>종목</th><th>원문 처리/대상</th><th>문장</th><th>회사 실적 후보</th><th>산업 후보</th><th>전망 포함</th><th>혼합·보류</th><th>가격 확인/대상</th><th>확인할 내용</th></tr>{''.join(table)}</table>
+<h2>문장 분류·가격 연결 상태</h2><table><tr><th>종목</th><th>원문 처리/대상</th><th>문장</th><th>회사 실적 후보</th><th>산업 후보</th><th>전망 포함</th><th>혼합·보류</th><th>용어 확인</th><th>가격 확인/대상</th><th>확인할 내용</th></tr>{''.join(table)}</table>
 <p>분류 열은 중복될 수 있습니다. 보고 표현은 실제 성과를 외부에서 검증했다는 뜻이 아닙니다. 본문의 표는 병합셀·단위를 자동 해석하지 않아 문장 분류에서 제외합니다.</p>
+<h2>용어 혼동 점검</h2><p>회계·관리 용어가 포함되어 따로 확인할 문장: {summary['counts']['technical_term_review']}개. '기대신용손실' 등의 용어 안에 있는 기대·추정·계획·예측만으로 미래 전망을 판정하지 않습니다. 같은 문장에 별도의 전망·계획이 있으면 그 표현은 유지하고 문장 전체는 보류합니다. 회사의 판매 지역이나 시장 진출 표현만으로 산업 전체 동향을 판정하지 않습니다.</p>
+<p>아직 사람이 전체 문장의 정답을 확인한 결과가 아닙니다. 보류가 줄거나 특정 분류 수가 바뀌었다고 정확도가 높아졌다고 판단하지 않습니다.</p>
 <h2>가격 자료 상태</h2><p>확인 {tally.get('observed',0)}건 · 이후 자료 대기 {tally.get('pending',0)}건 · 가격 기간 밖 {tally.get('outside_coverage',0)}건 · 품질 확인 {tally.get('quality_issue',0)}건 · 파일 확인 {tally.get('source_error',0)}건</p>
 <p>가격 비교 한 건은 보고서 접수번호와 관찰 구간의 조합입니다. 문장마다 같은 수익률을 복제하지 않습니다. 수집 시작 전 공시는 뒤늦은 첫 가격에 연결하지 않고 '가격 기간 밖'으로 표시합니다.</p>
 {''.join(sections)}

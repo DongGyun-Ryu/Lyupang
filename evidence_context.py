@@ -8,10 +8,16 @@ from datetime import datetime, time, timedelta
 from lyupang import CollectionError, SEOUL, parse_date
 from research_data import HORIZONS
 
-POLICY = "sentence_context_rules_v1"
-COMPANY = re.compile(r"당사|우리\s*회사|연결\s*기준|별도\s*기준")
-INDUSTRY = re.compile(r"시장은|시장이|시장의|시장\s*(?:규모|수요|성장)|(?:글로벌|세계|전체|국내)\s*.{0,15}시장|산업은|산업이|업계")
+POLICY = "sentence_context_rules_v2"
+COMPANY = re.compile(r"당사|우리\s*회사|연결\s*회사|연결\s*대상\s*회사|연결\s*기준|별도\s*기준")
+# A geographical sales destination ('미국시장에서는') does not establish
+# that the sentence describes the industry rather than the reporting company.
+INDUSTRY = re.compile(r"시장(?:은|이)(?![가-힣])|시장\s*(?:규모|수요|성장)|산업(?:은|이)(?![가-힣])|업계(?:는|가)(?![가-힣])")
 OUTLOOK = re.compile(r"전망|예상|예측|계획|목표|예정|기대|추정|추진|추구|확대할|것으로\s*보")
+TECHNICAL_TERMS = (
+    ("accounting_term", re.compile(r"기대\s*신용\s*손실|회계\s*추정|추정\s*(?:내용\s*연수|내용연수|잔존\s*가치|잔존가치|공정\s*가치|공정가치)|예상\s*신용\s*손실")),
+    ("management_term", re.compile(r"(?:자금\s*수지|현금\s*흐름|현금\s*수지)\s*예측|계획\s*표준\s*생산|(?:확정\s*급여|퇴직\s*급여)\s*계획")),
+)
 REPORTED = re.compile(r"하였습니다|했습니다|되었습니다|됐습니다|하였으며|했으며|되었으며|기록했|기록하였|달성했|달성하였|집계되었")
 PERFORMANCE = re.compile(r"매출|영업이익|순이익|영업손실|판매량|수익성|영업실적|거래액|실적")
 RISK = re.compile(r"위험|리스크|불확실|우려|손실\s*가능|경쟁\s*심화|환율\s*변동")
@@ -42,6 +48,24 @@ def classify(text, headings, company_name):
         found = [{"start": m.start(), "end": m.end(), "text": m.group()} for m in pattern.finditer(text)]
         if found:
             matches[name] = found
+    # Ignore only the cue inside a specifically identified compound term. Keep
+    # independent future clauses and the exact source positions for inspection.
+    excluded = []
+    terms = [(category, m) for category, pattern in TECHNICAL_TERMS for m in pattern.finditer(text)]
+    retained = []
+    for cue in matches.get("outlook", []):
+        term = next(((category, m) for category, m in terms
+                     if m.start() <= cue["start"] and cue["end"] <= m.end()), None)
+        if term:
+            category, match = term
+            excluded.append({**cue, "reason": category, "context_start": match.start(),
+                             "context_end": match.end(), "context_text": match.group()})
+        else:
+            retained.append(cue)
+    if retained:
+        matches["outlook"] = retained
+    else:
+        matches.pop("outlook", None)
     aliases = [company_name]
     if company_name in {"NAVER", "네이버"}:
         aliases = ["NAVER", "네이버"]
@@ -64,9 +88,20 @@ def classify(text, headings, company_name):
         reported = True
     orientation = "mixed" if outlook and reported else "outlook" if outlook else "reported" if reported else "unclear"
     topics = [key for key in ("performance", "risk") if matches.get(key)] or ["business"]
-    review = subject in {"mixed", "unclear"} or orientation in {"mixed", "unclear"} or len(text) > 2000
+    review_reasons = []
+    if subject in {"mixed", "unclear"}:
+        review_reasons.append("subject_" + subject)
+    if orientation in {"mixed", "unclear"}:
+        review_reasons.append("time_" + orientation)
+    if excluded:
+        # Removing a false future cue is not proof that the whole sentence is
+        # a realized result, even when numeric amounts or past verbs appear.
+        review_reasons.append("technical_term_requires_context")
+    if len(text) > 2000:
+        review_reasons.append("long_sentence")
     return {"subject": subject, "time_orientation": orientation, "topics": topics,
-            "status": "needs_review" if review else "rule_based_candidate", "matched_expressions": matches,
+            "status": "needs_review" if review_reasons else "rule_based_candidate", "matched_expressions": matches,
+            "excluded_expressions": excluded, "review_reasons": review_reasons,
             "company_heading_fallback": heading_fallback, "method": POLICY,
             "externally_verified": False, "causal_claim_verified": False}
 
@@ -157,7 +192,8 @@ def counts(statements):
     classes = [s["classification"] for s in statements]
     return {"sentences": len(classes),
             "company_reported_performance": sum(c["subject"] == "company" and c["time_orientation"] == "reported"
-                                                and "performance" in c["topics"] for c in classes),
+                                                and "performance" in c["topics"] and c["status"] == "rule_based_candidate" for c in classes),
             "industry": sum(c["subject"] == "industry" for c in classes),
             "outlook_included": sum(c["time_orientation"] in {"outlook", "mixed"} for c in classes),
+            "technical_term_review": sum(bool(c["excluded_expressions"]) for c in classes),
             "needs_review": sum(c["status"] == "needs_review" for c in classes)}
