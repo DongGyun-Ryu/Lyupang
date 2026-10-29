@@ -10,11 +10,12 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
          "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
-         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd", "report_context.py")
+         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd", "report_context.py",
+         "evidence_table.py", "EVIDENCE.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.13.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.14.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -22,7 +23,23 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 원문 문맥 근거 연결 0.13.0
+        guide = """Lyupang 회사별 근거 자료표 0.14.0
+
+이번 단계:
+새 폴더의 EVIDENCE.cmd만 실행하세요. 최신 CROSS_CHECK 결과와 저장 원문을 다시 확인합니다.
+설명의 반올림 금액과 재무 원문 표기값, 연결/별도·기간·공개 시점을 한 표에 모읍니다.
+같은 항목의 반복 설명은 근거를 모두 보관하고 한 항목으로 모읍니다.
+기본 공개 시점별 보기는 원래 수집 자료 기준일입니다.
+그 날짜에 공개된 최신 회계기간·최신 접수일을 먼저 선택합니다.
+최신 제출본에서 못 읽은 값은 과거 값이나 0으로 채우지 않습니다.
+같은 날 여러 제출본 또는 수집 범위 미완료는 보류합니다.
+보고서의 '정리 요약'과 '공개 시점별 자료 보기'를 알려주세요.
+표는 연구용 후보 자료입니다. 학습 승인·새 학습·주문과 연결하지 않습니다.
+추가 설치·인증키 입력·자료 재수집·CROSS_CHECK 재실행 없이 사용합니다.
+기존 원문·대조 보고서·모델·예측 기록은 그대로 보관합니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\evidence_tables의 새 폴더에 저장합니다.
+
+이전 0.13.0 문맥 근거 연결 안내:
 
 이번 단계:
 새 폴더의 CROSS_CHECK.cmd만 실행하세요. 같은 저장 자료를 읽고 새 보고서를 만듭니다.
