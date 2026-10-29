@@ -86,10 +86,50 @@ class FactAuditTests(unittest.TestCase):
         case["quantities"] = [{"text": "7,437억 원", "normalized_value": "-743700000000", "unit": "KRW"},
                               {"text": "44.5%", "normalized_value": "44.5", "unit": "percent", "metric_forbidden": ["investment"]}]
         case["context"] = {"status": "needs_review"}
-        result = audit.compare_case(case, self.data[1], self.data[2])
+        legacy = copy.deepcopy(self.data[1])
+        old = next(c for c in legacy if c["id"] == self.cash["id"])
+        next(q for q in old["measurements"] if q["text"] == "7,437억 원")["normalized_value"] = "743700000000"
+        next(q for q in old["measurements"] if q["text"] == "44.5%")["metric"] = "investment"
+        result = audit.compare_case(case, legacy, self.data[2])
         self.assertEqual(result["status"], "mismatch")
         self.assertFalse(result["quantity_checks"][0]["number_match"])
         self.assertFalse(result["quantity_checks"][1]["binding_match"])
+        self.assertEqual(audit.compare_case(case, self.data[1], self.data[2])["status"], "matched")
+
+    def test_signed_expression_offsets_are_checked_after_claim_hash_update(self):
+        claims = copy.deepcopy(self.data[1])
+        cash = next(c for c in claims if c["id"] == self.cash["id"])
+        q = next(q for q in cash["measurements"] if q.get("sign_expressions"))
+        q["sign_expressions"][0]["text"] = "(+)"
+        self.rewrite(claims)
+        with self.assertRaises(CollectionError): audit.load_facts(self.source)
+
+    def test_refresh_old_policy_reuses_same_business_and_keeps_prior_output(self):
+        old_claims = copy.deepcopy(self.data[1])
+        for c in old_claims: c["classification_policy"] = "source_statement_measurements_v2"
+        self.rewrite(old_claims)
+        path = self.source / "summary.json"
+        summary = json.loads(path.read_text()); summary["policy"] = "source_statement_measurements_v2"
+        path.write_text(json.dumps(summary))
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        with redirect_stdout(io.StringIO()), patch("kiwoom.get_client", side_effect=AssertionError("no API")), patch("dart_client.stored_key", side_effect=AssertionError("no key")):
+            refreshed = audit.prepare_input(self.source, self.root, True)
+        self.assertNotEqual(refreshed, self.source)
+        self.assertEqual(audit.load_facts(refreshed)[0]["policy"], "source_statement_measurements_v3")
+        self.assertEqual(before, {p: p.read_bytes() for p in before})
+        with patch.object(audit, "refresh_facts", side_effect=AssertionError("already current")):
+            self.assertEqual(audit.prepare_input(refreshed, self.root, True), refreshed)
+
+    def test_refresh_rejects_changed_business_manifest(self):
+        claims = copy.deepcopy(self.data[1])
+        for c in claims: c["classification_policy"] = "source_statement_measurements_v2"
+        self.rewrite(claims)
+        path = self.source / "summary.json"
+        summary = json.loads(path.read_text()); summary["policy"] = "source_statement_measurements_v2"
+        path.write_text(json.dumps(summary))
+        evidence = Path(summary["source_business"]) / "evidence.json"
+        evidence.write_bytes(evidence.read_bytes()+b" ")
+        with self.assertRaises(CollectionError): audit.prepare_input(self.source, self.root, True)
 
     def test_absence_changed_source_and_duplicate_quotes_are_never_passes(self):
         case = self.case()

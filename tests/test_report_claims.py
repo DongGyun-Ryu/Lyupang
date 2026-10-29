@@ -16,6 +16,26 @@ from test_business import CORP, archive, filing, xml_document
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_parenthesized_explicit_sign_is_applied_once_with_source_span(self):
+        for sign, value in (("(-)", "-743700000000"), ("( − )", "-743700000000"), ("(+)", "743700000000")):
+            text = f"현금유출 {sign} 7,437억 원입니다."
+            quantity = rc.measurements(text)[0]
+            self.assertEqual(quantity["text"], "7,437억 원")
+            self.assertEqual(quantity["normalized_value"], value)
+            expression = quantity["sign_expressions"][0]
+            self.assertEqual(text[expression["start"]:expression["end"]], sign)
+        self.assertEqual(rc.measurements("비율 (-) 0.5%입니다.")[0]["normalized_value"], "-0.5")
+
+    def test_parentheses_without_sign_and_conflicting_signs_are_not_negated(self):
+        quantity = rc.measurements("손실 (100억원)입니다.")[0]
+        self.assertEqual(quantity["normalized_value"], "10000000000")
+        self.assertIn("parentheses_no_negative_inference", quantity["qualifiers"])
+        for text in ("비용 (-) -100억원", "비용 (+) -100억원", "비용 (-) +100억원"):
+            quantity = rc.measurements(text)[0]
+            self.assertIsNone(quantity["normalized_value"])
+            self.assertEqual(quantity["status"], "needs_review")
+            self.assertEqual(quantity["reason"], "multiple_explicit_signs")
+
     def test_literal_money_scaling_is_decimal_exact_and_keeps_currencies_separate(self):
         cases = [("매출 333조 6,059억원", "333605900000000", "KRW"),
                  ("매출 1.25조원", "1250000000000.00", "KRW"),
@@ -67,6 +87,17 @@ class MeasurementTests(unittest.TestCase):
 
 
 class ClaimTests(unittest.TestCase):
+    def test_investing_cash_flow_does_not_become_general_investment(self):
+        for noun, metric in (("투자활동 현금유출", "investing_cash_outflow"),
+                             ("투자 활동 현금 유입", "investing_cash_inflow"),
+                             ("투자활동현금흐름", "investing_cash_flow")):
+            result = rc.structure_sentence(f"{noun}은 전년 대비 44.5% 감소한 (-) 7,437억 원입니다.", [], "NAVER")
+            self.assertEqual(result["measurements"][0]["metric"], metric)
+            self.assertEqual(result["measurements"][-1]["normalized_value"], "-743700000000")
+            self.assertEqual(result["status"], "needs_review")
+        ordinary = rc.structure_sentence("2025년 당사의 투자는 전년 대비 10% 증가했습니다.", [], "NAVER")
+        self.assertEqual(ordinary["measurements"][0]["metric"], "investment")
+
     def test_causal_background_metric_is_not_assigned_partner_cost_growth(self):
         text = "영업비용을 항목별로 나누어보면, 개발/운영비는 신규 채용에 따른 인원 증가 등으로 8.7% 상승하였고, 파트너비의 경우, 매출 증가의 영향 등으로 전년 대비 10.8% 상승하였습니다."
         result = rc.structure_sentence(text, [], "NAVER")

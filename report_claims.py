@@ -13,9 +13,12 @@ from decimal import Decimal, localcontext
 from evidence_context import classify, sentence_spans
 from lyupang import CollectionError, parse_date
 
-POLICY = "source_statement_measurements_v2"
+POLICY = "source_statement_measurements_v3"
 TOPIC_NAMES = {"performance": "매출·이익", "orders": "수주·계약", "investment": "투자", "cost": "비용", "risk": "위험요인"}
 METRICS = {
+    "투자활동현금유출": ("investing_cash_outflow", "investment"),
+    "투자활동현금유입": ("investing_cash_inflow", "investment"),
+    "투자활동현금흐름": ("investing_cash_flow", "investment"),
     "매출총이익률": ("gross_margin", "performance"), "매출총이익": ("gross_profit", "performance"),
     "영업수익": ("operating_revenue", "performance"),
     "매출원가": ("cost", "cost"), "영업이익률": ("operating_margin", "performance"),
@@ -34,7 +37,7 @@ METRICS = {
     "판매관리비": ("selling_cost", "cost"), "판매비와관리비": ("selling_cost", "cost"), "원재료비": ("material_cost", "cost"),
     "인건비": ("labor_cost", "cost"), "비용": ("cost", "cost"), "원가": ("cost", "cost"),
 }
-METRIC = re.compile("|".join(re.escape(word) for word in sorted(METRICS, key=len, reverse=True)))
+METRIC = re.compile(r"투자\s*활동\s*현금\s*(?:유출|유입|흐름)|" + "|".join(re.escape(word) for word in sorted(METRICS, key=len, reverse=True)))
 RISK = re.compile(r"위험|리스크|불확실|환율\s*변동|원자재\s*가격|손실\s*가능")
 CHANGE = re.compile(r"증가|감소|확대|축소|개선|악화|성장|체결|수주|투자|지출|부담|상승|하락")
 RELATED = re.compile(r"자회사|종속\s*(?:회사|기업)|관계회사|계열사|계열회사|[가-힣A-Za-z]{1,16}\s*(?:부문|사업부)|현대로템|현대캐피탈|현대카드|삼성디스플레이|Harman|하만", re.I)
@@ -99,6 +102,11 @@ def measurements(text):
                 unit = "percentage_points" if raw_unit.lower() in {"%p", "%포인트", "퍼센트포인트"} else "percent"
             row = {**where, "unit": unit, "raw_unit": raw_unit, "normalized_value": None,
                    "status": "needs_review", "reason": None, "metric": None, "metric_binding": "unbound"}
+            before_start = max(0, row["start"]-20)
+            prefix_sign = re.search(r"\(\s*(?P<sign>[+\-−])\s*\)\s*$", text[before_start:row["start"]])
+            if prefix_sign:
+                marked = span(prefix_sign)
+                row["sign_expressions"] = [{**marked, "start": before_start+marked["start"], "end": before_start+marked["end"]}]
             try:
                 if kind == "untyped":
                     raise ValueError("currency_or_count_unit_missing")
@@ -107,7 +115,10 @@ def measurements(text):
                 value = normalize_parts(match["parts"]) if kind == "quantity" else Decimal(match["number"].replace(",", ""))
                 if match["sign"] in {"△", "▲"}:
                     raise ValueError("ambiguous_sign_symbol")
-                if match["sign"] in {"-", "−"}:
+                if prefix_sign and match["sign"]:
+                    raise ValueError("multiple_explicit_signs")
+                sign = prefix_sign["sign"] if prefix_sign else match["sign"]
+                if sign in {"-", "−"}:
                     value = value.copy_negate()
                 row.update(normalized_value=format(value, "f"), status="supported")
             except (ValueError, ArithmeticError) as exc:
@@ -142,7 +153,8 @@ def metric_spans(text):
             continue
         if match.group() == "투자" and re.match(r"자|주식|손익|수익|부동산|등급", text[match.end():]):
             continue
-        result.append({**span(match), "metric": METRICS[match.group()][0], "topic": METRICS[match.group()][1]})
+        word = re.sub(r"\s+", "", match.group())
+        result.append({**span(match), "metric": METRICS[word][0], "topic": METRICS[word][1]})
     return result
 
 

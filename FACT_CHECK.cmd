@@ -13,7 +13,7 @@ if not exist "%LYUPANG_KWCLI_PY%" (
     pause
     exit /b 1
 )
-"%LYUPANG_KWCLI_PY%" -X utf8 "%~dp0check_facts.py" %*
+"%LYUPANG_KWCLI_PY%" -X utf8 "%~dp0check_facts.py" --refresh %*
 set "LYUPANG_RESULT=%ERRORLEVEL%"
 echo.
 pause

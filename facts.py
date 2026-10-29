@@ -30,6 +30,7 @@ REASONS = {"scope_requires_review": "회사 전체에 관한 수치인지 확인
     "numeric_expression_not_supported": "지원하지 않는 수치 표현", "multiple_amounts_for_same_metric": "같은 항목에 여러 금액이 있어 역할 확인 필요",
     "adjustment_or_netting_context": "차감·자산화·총액·순액 등 조정 문맥 확인 필요", "conditional_context": "가정·조건에 따른 설명인지 확인 필요"}
 METRIC_NAMES = {"revenue": "매출", "operating_revenue": "영업수익", "gross_profit": "매출총이익", "gross_margin": "매출총이익률",
+    "investing_cash_outflow": "투자활동 현금유출", "investing_cash_inflow": "투자활동 현금유입", "investing_cash_flow": "투자활동 현금흐름",
     "operating_profit": "영업이익", "operating_loss": "영업손실",
     "net_profit": "순이익", "net_loss": "순손실", "operating_margin": "영업이익률", "net_margin": "순이익률",
     "cost_ratio": "원가율", "revenue_share": "매출 비중", "cost": "비용·원가", "impairment": "손상차손",
@@ -94,9 +95,11 @@ def render_report(summary, claims):
                     for q in claim["measurements"][:8]:
                         binding = METRIC_NAMES.get(q["metric"], "항목 미확정")
                         binding_note = BINDING_NOTES.get(q["metric_binding"], "항목 연결 후보" if q["metric"] else "항목 연결 보류")
+                        sign_note = " · 부호 표현: " + " / ".join(e["text"] for e in q.get("sign_expressions", [])) if q.get("sign_expressions") else ""
                         quantities.append(f"<tr><td>{esc(q['text'])}</td><td>{esc(display_value(q))}</td>"
                             f"<td>{esc(binding)}</td><td>{'단위 읽음' if q['status']=='supported' else '확인 필요'}"
                             f" · {esc(binding_note)}"
+                            f"{esc(sign_note)}"
                             f"{' · 근사·범위 등 확인' if q['qualifiers'] else ''}</td></tr>")
                     period = " / ".join(p["text"] for p in claim["period_expressions"]) or "문장에 명시되지 않음"
                     basis = " / ".join(p["text"] for p in claim["basis_expressions"]) or "문장에 명시되지 않음"

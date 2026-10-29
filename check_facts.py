@@ -17,7 +17,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from business_text import source_html
-from facts import METRIC_NAMES, SCOPES, TIMES, display_value, tally
+from facts import METRIC_NAMES, SCOPES, TIMES, display_value, tally, run as refresh_facts
+from report_claims import POLICY
 from financial_history import report_period
 from lyupang import CollectionError, SEOUL, parse_date
 
@@ -75,7 +76,7 @@ def load_facts(source):
     raw_summary = content(source / "summary.json")
     summary = decoded(raw_summary)
     require(summary["schema_version"] == 1 and summary["policy"] in {
-        "source_statement_measurements_v1", "source_statement_measurements_v2"})
+        "source_statement_measurements_v1", "source_statement_measurements_v2", "source_statement_measurements_v3"})
     require(summary.get("training_executed") is False and summary.get("model_inputs_modified") is False
             and summary.get("live_trading_allowed") is False)
     raw_claims = content(source / "claims.jsonl")
@@ -134,6 +135,8 @@ def load_facts(source):
                 valid_span(claim["text"], item)
                 for blocker in item.get("binding_blockers", []):
                     valid_span(claim["text"], blocker)
+                for expression in item.get("sign_expressions", []):
+                    valid_span(claim["text"], expression)
         for quantity in claim["measurements"]:
             if quantity["normalized_value"] is not None:
                 number(quantity["normalized_value"])
@@ -141,6 +144,21 @@ def load_facts(source):
     for stock in summary["stocks"]:
         require(tally([c for c in claims if c["code"] == stock["code"]]) == stock["counts"])
     return summary, claims, documents, source_files, raw_summary, raw_claims
+
+
+def prepare_input(source, root, refresh):
+    if not refresh:
+        return source
+    original, *_ = load_facts(source)
+    if original["policy"] == POLICY:
+        return source
+    business_source = Path(original["source_business"])
+    raw = content(business_source / "evidence.json")
+    require(hashlib.sha256(raw).hexdigest() == original["source_evidence_sha256"],
+            "원래 사업보고서 결과가 바뀌어 자동 재정리하지 않았습니다. 기존 파일을 확인해주세요.")
+    print("저장된 같은 사업보고서로 수치를 새 규칙에 따라 정리합니다. 이전 결과는 보존합니다.")
+    target, _ = refresh_facts(business_source, root)
+    return target
 
 
 def load_reference():
@@ -268,9 +286,11 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, default=default)
     parser.add_argument("--input", type=Path, help="기존 FACTS 결과; 기본은 최신 실행")
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument("--refresh", action="store_true", help="추출 규칙이 바뀌었으면 저장된 같은 원문으로 재정리 후 검증")
     args = parser.parse_args(argv)
     try:
-        target, summary = run(args.input or latest_facts(args.root / "facts"), args.root)
+        source = prepare_input(args.input or latest_facts(args.root / "facts"), args.root, args.refresh)
+        target, summary = run(source, args.root)
         counts = summary["case_counts"]
         print(f"\n출처 대조: {summary['documents']}건 · 저장 문장 {summary['claims']}개")
         print(f"개발 기준 12사례: 부합 {counts['matched']} · 불일치 {counts['mismatch']} · 미확인 {sum(counts[k] for k in ('missing','source_mismatch','ambiguous'))}")

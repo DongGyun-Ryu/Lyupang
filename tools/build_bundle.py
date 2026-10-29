@@ -14,7 +14,7 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.11.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.11.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -22,7 +22,19 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 수치와 항목의 검증 0.11.0
+        guide = """Lyupang 수치와 항목의 검증 0.11.1
+
+현금유출 문장 보완:
+새 폴더의 FACT_CHECK.cmd만 실행하세요.
+저장된 이전 FACTS 결과와 원래 사업보고서 기록을 확인하고, 새 규칙으로 재정리한 뒤 검증합니다.
+이미 새 규칙의 결과가 있으면 재사용합니다. 이전 추출 결과와 검증 보고서는 그대로 보관합니다.
+추가 키 입력·설치·재수집 없이 저장된 같은 사업보고서를 사용합니다.
+명시적인 (-) 부호를 읽고, 투자활동 현금유출·유입·흐름을 일반 투자액과 구분합니다.
+숫자만 괄호로 묶였다고 음수로 추정하지 않으며, 부호가 중복되면 보류합니다.
+이전 12개 개발 기준은 바꾸지 않았습니다. 보완 뒤 부합해도 새 문서의 정확도나 학습 승인을 뜻하지 않습니다.
+보고서의 '검증 요약'만 알려주세요. 기존 모델·관찰 예측은 유지합니다.
+
+이전 0.11.0 검증 안내:
 
 이번 단계:
 새 폴더의 FACT_CHECK.cmd만 실행하세요. 저장된 최신 FACTS 결과 전체를 읽습니다.
