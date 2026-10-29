@@ -17,5 +17,6 @@ text_validation/
 text_learning/
 facts/
 fact_checks/
+financial_crosschecks/
 .env
 *.log

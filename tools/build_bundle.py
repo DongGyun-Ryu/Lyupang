@@ -10,11 +10,11 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
          "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
-         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd")
+         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.11.1.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.12.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -22,7 +22,25 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 수치와 항목의 검증 0.11.1
+        guide = """Lyupang 설명 금액과 재무 원문 대조 0.12.0
+
+이번 단계:
+새 폴더의 CROSS_CHECK.cmd만 실행하세요.
+저장된 최신 FACTS 결과와 원래 학습 때 확인한 재무 원문을 읽습니다.
+기존 키 입력·설치·재수집·FACTS/학습 재실행은 필요하지 않습니다.
+같은 종목·접수번호·회계기간·명시적 연결/별도 기준의 표준 재무 항목만 대조합니다.
+금액 수준과 증감액·증감률, 회사 전체와 사업 부문을 섞지 않습니다.
+표기값이 같은 경우와 반올림 표시 범위가 겹치는 경우, 값이 다른 경우를 나눕니다.
+원문 누락·범위 미확정 등은 확인할 이유로 표시하며 통과로 채우지 않습니다.
+같은 회사의 설명과 재무 제출 자료를 비교하는 것이며 독립된 전문가의 정답 검증은 아닙니다.
+보고서의 '대조 요약'과 '재무 원문 상태' 표를 알려주세요.
+원문을 읽었어도 조건이 맞지 않아 대조가 0건일 수 있습니다. 이 경우 정확도가 검증된 것이 아닙니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\financial_crosschecks의 새 폴더에 저장합니다.
+기존 모델·예측·원문은 유지하며 이번 금액을 학습 입력에 넣거나 실제 주문하지 않습니다.
+클라우드에서는 실제 사업보고서 본문과 합성 재무자료로 기능을 검사했습니다.
+사용자 PC의 실제 재무 원문 대조 건수는 실행한 뒤 확인해야 합니다.
+
+이전 0.11.1 현금유출 보완 안내:
 
 현금유출 문장 보완:
 새 폴더의 FACT_CHECK.cmd만 실행하세요.
