@@ -67,6 +67,36 @@ class MeasurementTests(unittest.TestCase):
 
 
 class ClaimTests(unittest.TestCase):
+    def test_actual_report_patent_counts_are_not_investment_amounts(self):
+        text = "2025년 중 총 38조원의 R&D투자를 통해 국내 특허 10,639건, 미국 특허 10,347건 등을 등록하였습니다."
+        result = rc.structure_sentence(text, ["II. 사업의 내용"], "삼성전자")
+        patents = [v for v in result["measurements"] if v["unit"] == "건"]
+        self.assertEqual(len(patents), 2)
+        self.assertTrue(all(v["metric"] is None for v in patents))
+        self.assertIn(patents[0]["metric_binding"], {"metric_unit_mismatch", "different_quantity_role"})
+        self.assertEqual(result["status"], "needs_review")
+        for sample, metric in (("2025년 당사의 투자는 38조원입니다.", "investment"),
+                               ("2025년 당사의 판매량은 414만대입니다.", "sales_volume")):
+            quantity = rc.structure_sentence(sample, [], "삼성전자")["measurements"][0]
+            self.assertEqual(quantity["metric"], metric)
+        for sample in ("2025년 당사의 매출은 100명입니다.", "2025년 당사의 판매량은 100억원입니다."):
+            self.assertIsNone(rc.structure_sentence(sample, [], "삼성전자")["measurements"][0]["metric"])
+
+    def test_investment_does_not_bind_asset_increase_in_actual_report(self):
+        text = "자산의 주요 증가 원인은 단기금융상품 등의 유동자산의 증가 20조 6,223억원 및반도체ㆍ디스플레이 패널 사업의 대규모 시설투자에 따른 유형자산의 증가 9조 3,596억원 등입니다."
+        result = rc.structure_sentence(text, ["II. 사업의 내용"], "삼성전자")
+        self.assertTrue(all(v["metric"] is None for v in result["measurements"]))
+        last = result["measurements"][-1]
+        self.assertEqual(last["normalized_value"], "9359600000000")
+        self.assertEqual(last["metric_binding"], "different_quantity_role")
+        for blocker in last["binding_blockers"]:
+            self.assertEqual(text[blocker["start"]:blocker["end"]], blocker["text"])
+
+    def test_topic_only_titles_do_not_count_as_statements(self):
+        for text in ("바. 수주상황", "(2) 주요 투자 현황", "가. 매출실적"):
+            self.assertIsNone(rc.structure_sentence(text, ["II. 사업의 내용"], "삼성전자"))
+        self.assertIsNotNone(rc.structure_sentence("2025년 당사는 수주 100억원을 기록했습니다.", [], "삼성전자"))
+
     def test_reported_company_amount_and_growth_have_exact_evidence(self):
         text = "2025년 당사의 매출은 333조 6,059억원으로 전년 동기 대비 10.9% 증가하였습니다."
         result = rc.structure_sentence(text, ["II. 사업의 내용"], "삼성전자")

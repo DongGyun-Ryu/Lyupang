@@ -36,6 +36,10 @@ METRIC_NAMES = {"revenue": "매출", "operating_revenue": "영업수익", "gross
     "sales_volume": "판매량", "order_backlog": "수주잔고", "orders": "수주", "contract": "공급계약·체결",
     "investment": "투자", "research_cost": "연구개발비", "operating_cost": "영업비용", "selling_cost": "판매관리비",
     "material_cost": "원재료비", "labor_cost": "인건비"}
+BINDING_NOTES = {"metric_unit_mismatch": "단위와 항목이 맞지 않아 연결 보류",
+    "different_quantity_role": "중간에 다른 수치 대상이 있어 연결 보류",
+    "multiple_metrics_in_clause": "여러 항목이 있어 연결 보류",
+    "percent_relation_unclear": "비율의 뜻이 불명확해 연결 보류"}
 
 
 def tally(claims):
@@ -88,8 +92,10 @@ def render_report(summary, claims):
                     quantities = []
                     for q in claim["measurements"][:8]:
                         binding = METRIC_NAMES.get(q["metric"], "항목 미확정")
+                        binding_note = BINDING_NOTES.get(q["metric_binding"], "항목 연결 후보" if q["metric"] else "항목 연결 보류")
                         quantities.append(f"<tr><td>{esc(q['text'])}</td><td>{esc(display_value(q))}</td>"
                             f"<td>{esc(binding)}</td><td>{'단위 읽음' if q['status']=='supported' else '확인 필요'}"
+                            f" · {esc(binding_note)}"
                             f"{' · 근사·범위 등 확인' if q['qualifiers'] else ''}</td></tr>")
                     period = " / ".join(p["text"] for p in claim["period_expressions"]) or "문장에 명시되지 않음"
                     basis = " / ".join(p["text"] for p in claim["basis_expressions"]) or "문장에 명시되지 않음"

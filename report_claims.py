@@ -13,7 +13,7 @@ from decimal import Decimal, localcontext
 from evidence_context import classify, sentence_spans
 from lyupang import CollectionError, parse_date
 
-POLICY = "source_statement_measurements_v1"
+POLICY = "source_statement_measurements_v2"
 TOPIC_NAMES = {"performance": "매출·이익", "orders": "수주·계약", "investment": "투자", "cost": "비용", "risk": "위험요인"}
 METRICS = {
     "매출총이익률": ("gross_margin", "performance"), "매출총이익": ("gross_profit", "performance"),
@@ -52,6 +52,12 @@ COMPONENT = re.compile(rf"(?P<number>{NUMBER})\s*(?P<scale>{SCALE})?")
 CURRENCIES = {"원": "KRW", "달러": "USD", "유로": "EUR", "엔": "JPY"}
 YEARS = re.compile(r"(?<![0-9])(?P<year>(?:19|20)[0-9]{2})년(?:\s*[1-4]분기|\s*상반기|\s*하반기)?")
 RELATIVE_PERIOD = re.compile(r"전년\s*동기|전년|전기|당기|당해\s*연도|올해|내년")
+RATIO_METRICS = {"operating_margin", "net_margin", "gross_margin", "cost_ratio", "revenue_share"}
+MONEY_METRICS = {metric for metric, _ in METRICS.values()} - RATIO_METRICS - {"sales_volume"}
+# These nouns introduce quantities with a different role. Do not carry a
+# nearby investment/cost/etc. label across them, even if both values are money.
+BINDING_BLOCKER = re.compile(r"유형자산|무형자산|유동자산|단기금융상품|특허|영업권|투자주식|임직원|직원|인원")
+TOPIC_TITLE = re.compile(r"^(?:[가-하][.．]\s*|\([0-9]+\)\s*)?(?:매출\s*(?:및\s*수주)?\s*(?:실적|현황|상황)|수주\s*(?:현황|상황)|(?:주요\s*)?투자\s*현황|위험\s*요인)[.。]?$" )
 
 
 def span(match):
@@ -149,27 +155,36 @@ def bind_measurements(text, values, metrics):
         candidates = {m["metric"] for m in anchors}
         if len(candidates) == 1:
             row.update(metric=anchors[-1]["metric"], metric_binding="nearby_explicit_metric")
+            blockers = list(BINDING_BLOCKER.finditer(text, anchors[-1]["end"], row["start"]))
+            if blockers:
+                row.update(metric=None, metric_binding="different_quantity_role", binding_blockers=[span(m) for m in blockers])
         elif len(candidates) > 1:
             row["metric_binding"] = "multiple_metrics_in_clause"
         elif (previous and previous["metric"] and row["unit"] in {"percent", "percentage_points"}
               and len({m["metric"] for m in metrics}) == 1
               and re.search(r"대비|전년비|증가|감소|상승|하락", text[max(0, previous["end"]):row["end"]+12])):
             row.update(metric=previous["metric"], metric_binding="explicit_change_after_amount")
-        if row["metric"] in {"operating_margin", "net_margin", "gross_margin", "cost_ratio", "revenue_share"}:
+        if row["metric"] in RATIO_METRICS:
             if row["unit"] not in {"percent", "percentage_points"}:
                 row.update(metric=None, metric_binding="metric_unit_mismatch")
-        if row["unit"] in {"percent", "percentage_points"} and row["metric"] not in {"operating_margin", "net_margin", "gross_margin", "cost_ratio", "revenue_share"}:
+        elif row["metric"] in MONEY_METRICS and row["unit"] not in {*CURRENCIES.values(), "percent", "percentage_points"}:
+            row.update(metric=None, metric_binding="metric_unit_mismatch")
+        elif row["metric"] == "sales_volume" and row["unit"] not in {"대", "개", "건", "톤", "percent", "percentage_points"}:
+            row.update(metric=None, metric_binding="metric_unit_mismatch")
+        if row["unit"] in {"percent", "percentage_points"} and row["metric"] not in RATIO_METRICS:
             window = text[max(0, row["start"]-25):row["end"]+15]
             if not re.search(r"대비|전년비|증가|감소|상승|하락", window):
                 row.update(metric=None, metric_binding="percent_relation_unclear")
         changed = bool(re.search(r"대비|전년비|증가|감소|상승|하락", text[max(0,row["start"]-25):row["end"]+15]))
         row["relation"] = ("relative_change_candidate" if changed else "ratio_or_rate_unspecified") if row["unit"] in {"percent", "percentage_points"} else "reported_amount_or_count"
-        if changed and row["unit"] == "percent" and row["metric"] in {"operating_margin", "net_margin", "gross_margin", "cost_ratio", "revenue_share"}:
+        if changed and row["unit"] == "percent" and row["metric"] in RATIO_METRICS:
             row["qualifiers"].append("rate_change_basis_requires_review")
         previous = row
 
 
 def structure_sentence(text, headings, company_name):
+    if TOPIC_TITLE.fullmatch(text.strip()):
+        return None
     metrics = metric_spans(text)
     values = measurements(text)
     topics = sorted({m["topic"] for m in metrics} | ({"risk"} if RISK.search(text) else set()))

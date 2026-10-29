@@ -13,7 +13,7 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.10.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.10.1.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -21,7 +21,14 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 사업 설명의 근거와 수치 0.10.0
+        guide = """Lyupang 사업 설명의 근거와 수치 0.10.1
+
+사용자 보고서에서 확인한 항목 연결 보완:
+특허 건수를 투자 금액에 연결하지 않으며, 시설투자에 따른 자산 증가액도 투자액으로 확정하지 않습니다.
+단위를 읽은 상태와 항목 연결 보류 이유를 따로 표시합니다.
+'바. 수주상황' 같은 제목만으로는 주장 후보를 만들지 않습니다.
+새 폴더의 FACTS.cmd만 다시 실행하세요. 기존 보고서·모델·예측을 덮어쓰지 않습니다.
+이번 보완은 이미 본 보고서의 오류 수정이며 새로운 문서에서 정확도를 검증한 결과는 아닙니다.
 
 이번 단계:
 새 폴더의 FACTS.cmd만 실행하세요. 기존 BUSINESS에서 읽은 사업보고서를 재사용합니다.
