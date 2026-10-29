@@ -15,5 +15,6 @@ business_documents/
 context/
 text_validation/
 text_learning/
+facts/
 .env
 *.log

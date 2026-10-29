@@ -9,11 +9,11 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
-         "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd")
+         "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.9.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.10.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -21,7 +21,21 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 설명 추가 모델 연구 0.9.0
+        guide = """Lyupang 사업 설명의 근거와 수치 0.10.0
+
+이번 단계:
+새 폴더의 FACTS.cmd만 실행하세요. 기존 BUSINESS에서 읽은 사업보고서를 재사용합니다.
+추가 설치·인증키 입력·자료 재수집 없이 매출·이익, 수주, 투자, 비용, 위험요인 표현을 정리합니다.
+각 문장의 원문, 기간·회사·계열사·부문·전망 표현과 수치를 함께 보여줍니다.
+명확한 통화 단위만 정리합니다. 예: 333조 6,059억원 → 333,605,900,000,000원.
+여러 항목·기간, 근사치·범위·단위 누락·전망·조정 금액은 확인 필요로 남깁니다.
+회사 보고 표현 후보도 사실 검증이나 정확한 의미 이해가 끝났다는 뜻은 아닙니다.
+표의 병합셀·주석 단위는 해석하지 않습니다. 모든 수치·주장을 빠짐없이 읽는 기능도 아닙니다.
+보고서의 '구조화 상태' 표와 매출 문장 예시 하나를 알려주세요.
+결과는 %LOCALAPPDATA%\\Lyupang\\facts의 새 폴더에 저장하고 브라우저로 엽니다.
+현재 OBSERVE 창·고정 모델·예측 기록과 설명 추가 연구 모델은 그대로 유지합니다.
+이번 결과는 아직 모델 입력에 넣지 않습니다. 재학습·모의매매·실제 주문은 실행하지 않습니다.
+이미 본 사업보고서의 개발용 추출이며 새로운 자료에서 정확도를 검증한 결과는 아닙니다.
 
 분석·학습 기능 확장:
 새 폴더의 LEARN_TEXT.cmd를 실행하세요.
