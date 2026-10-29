@@ -162,22 +162,30 @@ def text_quantum(quantity):
     return quantum if cursor and not body[cursor:].strip() else None
 
 
-def compare_amount(claim, quantity, document):
+def compare_amount(claim, quantity, document, *, context=None):
     result = {"claim_id": claim["id"], "code": claim["code"], "receipt_no": claim["receipt_no"], "block_id": claim["block_id"],
         "text": claim["text"], "quantity": quantity, "status": "not_comparable", "reasons": [], "financial_facts": [],
-        "difference_krw": None, "rounding_half_width_krw": None, "model_input_approved": False}
+        "difference_krw": None, "rounding_half_width_krw": None, "model_input_approved": False,
+        "context_resolution": context}
     reasons = result["reasons"]
     if document.get("status") != "read": reasons.append("financial_source_unavailable")
     if quantity["status"] != "supported" or quantity["unit"] != "KRW" or quantity["normalized_value"] is None or quantity["qualifiers"]:
         reasons.append("unsupported_amount")
-    if claim["status"] != "reported_candidate" or claim["scope"] != "company" or claim["time_orientation"] != "reported":
+    permitted = {"period_not_single_explicit_year", "multiple_reporting_bases", "multiple_amounts_for_same_metric"}
+    grouped = set(claim.get("review_reasons", [])) & {"multiple_reporting_bases", "multiple_amounts_for_same_metric"}
+    context_review = bool(context and claim["status"] == "needs_review" and context["year"] is not None and context["scope"] is not None
+        and context["same_metric_scope_amounts"] == 1 and set(claim.get("review_reasons", [])) <= permitted
+        and (not grouped or context["basis_method"] == "clause_explicit"))
+    if (claim["status"] != "reported_candidate" and not context_review) or claim["scope"] != "company" or claim["time_orientation"] != "reported":
         reasons.append("statement_requires_review")
     explicit = [p for p in claim["period_expressions"] if p["kind"] == "explicit_year"]
     year = explicit[0]["year"] if len(explicit) == 1 and re.fullmatch(r"[0-9]{4}년", explicit[0]["text"]) else None
+    if context is not None: year = context["year"]
     if re.search(r"분기|상반기|하반기|[0-9]+\s*개월|[0-9]+\s*월|말\s*현재", claim["text"]): year = None
     if year is None: reasons.append("period_unclear")
     basis = {re.sub(r"\s+", "", b["text"]) for b in claim["basis_expressions"]}
     scope = {"연결기준": "CFS", "별도기준": "OFS"}.get(next(iter(basis))) if len(basis) == 1 else None
+    if context is not None: scope = context["scope"]
     if scope is None: reasons.append("basis_unclear")
     if year is not None and claim["report_period_end"] != f"{year}-12-31": reasons.append("period_mismatch")
     if quantity["metric"] in {"net_loss", "operating_loss"}: reasons.append("loss_sign_unclear")
@@ -186,7 +194,7 @@ def compare_amount(claim, quantity, document):
     if (re.search(r"증감액|증가액|감소액|증가분|감소분|증대액|순증|순감", before)
             or re.match(r"\s*(?:이|가)?\s*(?:증가|감소|증감|늘|줄|증대|개선|악화)", after)):
         reasons.append("amount_change_context")
-    if (re.search(r"지배주주|비지배|소유주|주당|계속영업|중단영업|세전|차감전|매출\s*채권|국내\s*매출|해외\s*매출|내수\s*매출|수출\s*매출", before)):
+    if (re.search(r"지배주주|비지배|소유주|주당|계속영업|중단영업|세전|차감전|매출\s*채권|국내\s*매출|해외\s*매출|내수\s*매출|수출\s*매출|부문|사업부|공장|사업장|자회사", before)):
         reasons.append("submetric_context")
     if reasons:
         return result

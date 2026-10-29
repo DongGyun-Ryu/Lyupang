@@ -108,7 +108,7 @@ class FinancialComparisonTests(unittest.TestCase):
         self.assertEqual(fc.compare_amount(c, c["measurements"][0], doc)["reasons"], ["fact_missing"])
 
     def test_partial_sales_receivables_and_attributable_profit_are_not_total_values(self):
-        for noun in ("국내 매출", "매출채권", "지배주주 순이익", "세전 순이익"):
+        for noun in ("국내 매출", "매출채권", "지배주주 순이익", "세전 순이익", "공장 매출"):
             c = claim(f"2023년 당사의 연결 기준 {noun}은 200원입니다.")
             result = fc.compare_amount(c, c["measurements"][0], financial_doc())
             self.assertEqual(result["status"], "not_comparable")
@@ -167,6 +167,29 @@ class CrosscheckWorkflowTests(unittest.TestCase):
         self.assertEqual((target / "input_claims.jsonl").read_bytes(), (self.source / "claims.jsonl").read_bytes())
         rows = [json.loads(s) for s in (target / "comparisons.jsonl").read_text().splitlines()]
         self.assertEqual(sum(r["status"] == "exact_match" for r in rows), 1)
+
+    def test_context_pipeline_keeps_baseline_and_cites_same_report_without_rewriting_claims(self):
+        research = self.root / "research/sample"
+        client = Mock(); client.companies.return_value = {"005930": {"corp_code": CORP, "corp_name": "삼성전자"}}
+        client.company_identifiers.return_value = {CORP}
+        client.disclosures.return_value = [filing(receipt="20240312000001", day="2024-03-12", title="사업보고서 (2023.12)")]
+        extra = '<P>아래 실적은 2023년 연결기준으로 작성하였습니다.</P><P>2023년 당사의 매출은 200원입니다.</P>'
+        client.original_document.return_value = archive(xml_document(extra=extra), receipt="20240312000001")
+        source, _ = business.run(research, self.root / "business", self.root / "business_context_documents", client, progress=lambda _: None)
+        input_facts, _ = facts.run(source, self.root, progress=lambda _: None)
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        target, summary = cc.run(input_facts, self.root, self.learning, progress=lambda _: None)
+        self.assertEqual(summary["baseline_compared"], 0)
+        self.assertEqual(summary["context_compared"], 1)
+        self.assertEqual(summary["context_evidence_compared"], 1)
+        baseline = [json.loads(x) for x in (target / "baseline_comparisons.jsonl").read_text().splitlines()]
+        rows = [json.loads(x) for x in (target / "comparisons.jsonl").read_text().splitlines()]
+        self.assertEqual(len(baseline), len(rows))
+        compared = next(r for r in rows if r["status"] == "exact_match")
+        self.assertTrue(compared["context_resolution"]["evidence"])
+        self.assertEqual(before, {p: p.read_bytes() for p in before})
+        self.assertIn("기간·기준 근거 원문", (target / "report.html").read_text())
+        self.assertFalse(summary["learning_ready"])
 
     def test_wrong_receipt_or_corrupt_cache_does_not_use_other_receipts(self):
         (self.cache / "original.zip").write_bytes(self.raw+b"changed")

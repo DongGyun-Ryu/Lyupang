@@ -22,6 +22,7 @@ from facts import METRIC_NAMES, display_value
 from financial_crosscheck import TEXT_METRICS, STATES, REASONS, cached_xbrl, compare_amount, parse_facts
 from financial_history import report_period
 from lyupang import CollectionError, SEOUL, parse_date
+from report_context import ContextIndex, POLICY as CONTEXT_POLICY
 
 
 def learning_source(root):
@@ -73,10 +74,20 @@ def row_html(row):
     if row["status"] == "rounding_overlap": notes = "반올림을 가정한 표시 범위만 겹칩니다. 금액이 같거나 해석이 옳다는 확정이 아닙니다."
     source = f"text_sources/{row['code']}_{row['receipt_no']}.html#{row['block_id']}"
     links = " · ".join(f"<a href='financial_sources/{row['code']}_{row['receipt_no']}/facts.html#{f['id']}'>재무 위치 {i+1}</a>" for i, f in enumerate(row["financial_facts"]))
+    context = row.get("context_resolution")
+    context_html = ""
+    if context:
+        names = {"sentence_explicit": "문장에 직접 표시", "clause_explicit": "같은 문장의 범위별 구분", "source_context": "원문 문맥에서 연결", "unresolved": "미확정"}
+        scope = {"CFS": "연결", "OFS": "별도"}.get(context["scope"], "미확정")
+        context_html = f"<p>대조 기간: {esc(context['year'] or '미확정')} ({names[context['year_method']]}) · 기준: {scope} ({names[context['basis_method']]})</p>"
+        for evidence in context["evidence"]:
+            link = f"text_sources/{evidence['code']}_{evidence['receipt_no']}.html#{evidence['block_id']}"
+            context_html += f"<blockquote>{esc(evidence['text'])}</blockquote><p><a href='{link}'>기간·기준 근거 원문</a> · 문단 {esc(evidence['block_id'])} · 문자 {evidence['start']}~{evidence['end']}</p>"
+        if context["conflicts"]: context_html += "<p>적용 범위가 섞이거나 모호한 문맥은 가져오지 않았습니다.</p>"
     return (f"<article><h3>{esc(STATES[row['status']])} · {esc(row['code'])} · {esc(METRIC_NAMES.get(q['metric'], q['metric']))}</h3>"
         f"<p>접수번호 {esc(row['receipt_no'])}</p><blockquote>{esc(row['text'])}</blockquote>"
         f"<p>설명 수치: {esc(q['text'])} → {esc(value)}<br>재무 원문: {esc(references)}<br>차이(설명−재무): {esc(row['difference_krw'] if row['difference_krw'] is not None else '미대조')} 원</p>"
-        f"<p>{esc(notes)}</p><p><a href='{source}'>설명 원문</a> · {links}</p></article>")
+        f"<p>{esc(notes)}</p>{context_html}<p><a href='{source}'>설명 원문</a> · {links}</p></article>")
 
 
 def render_report(summary, documents, rows, *, all_rows=False):
@@ -100,6 +111,8 @@ def render_report(summary, documents, rows, *, all_rows=False):
 매출·영업수익·이익/손실에 연결한 수치 {summary['financial_quantities']}개 중 원화 금액 {summary['krw_amounts']}개.</p>
 <table><tr><th>조건 내 표기값 같음</th><th>표시 정밀도 범위 겹침</th><th>조건 내 금액 다름</th><th>조건 확인 필요</th></tr><tr><td>{counts['exact_match']}</td><td>{counts['rounding_overlap']}</td><td>{counts['value_mismatch']}</td><td>{counts['not_comparable']}</td></tr></table>
 <p>정확도 비율이 아닙니다. 조건 확인 필요는 통과·불일치로 채우지 않습니다. 대조 0건이면 검증 완료가 아닙니다. 범위 겹침은 표시 단위로 반올림했다고 가정했을 때의 후보이며 같은 값이라는 확정이 아닙니다.</p>
+<h2>문맥 근거 연결</h2><p>같은 수치를 문장만으로 대조하면 {summary['baseline_compared']}건, 원문 문맥을 포함하면 {summary['context_compared']}건입니다. 문맥 근거가 연결된 대조는 {summary['context_evidence_compared']}건입니다. 이 증가가 정확도 향상을 입증하지 않습니다. 원래 수치·문장·모델을 바꾸지 않습니다.</p>
+<p>같은 문장의 연결/별도 구분, 같은 문단의 단일 기준, 현재 제목, 적용 방향이 명시된 인접 선언, 해당 장을 명시한 작성 기준과 명시적 회계기수-연도 쌍만 제한적으로 사용합니다. 근거 표현의 문단·문자 위치·해시를 보관합니다. 다른 회사·혼합 범위·여러 연도·전망·참조 문맥은 보류합니다. 보고서 연도나 재무 금액에 맞춰 기준을 고르지 않습니다. 이 규칙이 모든 문맥의 적용 범위를 정확히 이해한다는 보장은 없습니다.</p>
 <p>같은 접수번호·기간·명시적 연결/별도 기준과 표준 항목이 맞을 때만 대조합니다. 사업 부문·전망·증감률·여러 금액 등 해석이 남은 문장은 확정하지 않습니다. 범위가 없는 XBRL 문맥을 연결로 추정하지 않습니다. 매출·영업수익은 표준 Revenue에 제한해 대응하며 모든 업종의 회계 의미가 같다고 인증하지 않습니다. 표준 항목 일부만 지원합니다.</p>
 <h2>재무 원문 상태</h2><table><tr><th>종목</th><th>접수번호</th><th>읽기</th><th>확인할 내용</th></tr>{document_rows}</table>
 <p>{esc(' / '.join(summary['setup_errors']))}</p><h2>대조하지 못한 이유</h2><table>{reasons}</table><p>한 수치에 여러 사유가 있을 수 있습니다.</p>
@@ -144,7 +157,11 @@ def run(source, root, learning=None, cache=None, *, progress=print):
         except Exception as exc:
             doc["reason"] = safe_reason(exc)
         finance[code, receipt] = doc
-    rows = [compare_amount(c, q, finance[c["code"], c["receipt_no"]]) for c in claims for q in c["measurements"] if q["metric"] in TEXT_METRICS]
+    indexes = {key: ContextIndex(doc["blocks"], doc["company_name"], code=key[0], receipt=key[1]) for key, doc in text_docs.items()}
+    pairs = [(c, q) for c in claims for q in c["measurements"] if q["metric"] in TEXT_METRICS]
+    baseline = [compare_amount(c, q, finance[c["code"], c["receipt_no"]]) for c, q in pairs]
+    rows = [compare_amount(c, q, finance[c["code"], c["receipt_no"]],
+                context=indexes[c["code"], c["receipt_no"]].resolve(c, q)) for c, q in pairs]
     counts = {state: sum(r["status"] == state for r in rows) for state in STATES}
     reasons = Counter(reason for row in rows for reason in row["reasons"])
     summary = {"schema_version": 1, "created_at": datetime.now(SEOUL).isoformat(), "source_facts": str(source.resolve()),
@@ -155,6 +172,10 @@ def run(source, root, learning=None, cache=None, *, progress=print):
         "financial_read": sum(d["status"] == "read" for d in finance.values()),
         "financial_quantities": len(rows), "krw_amounts": sum(r["quantity"]["unit"] == "KRW" for r in rows),
         "comparison_counts": counts, "reason_counts": dict(reasons), "setup_errors": setup_errors,
+        "context_policy": CONTEXT_POLICY, "baseline_counts": {s: sum(r['status'] == s for r in baseline) for s in STATES},
+        "baseline_compared": sum(r['status'] != 'not_comparable' for r in baseline),
+        "context_compared": sum(r['status'] != 'not_comparable' for r in rows),
+        "context_evidence_compared": sum(r['status'] != 'not_comparable' and bool(r['context_resolution']['evidence']) for r in rows),
         "learning_ready": False, "independent_accuracy_verified": False, "fresh_unseen_evaluation": False,
         "model_inputs_modified": False, "training_executed": False, "live_trading_allowed": False,
         "status": "review_required"}
@@ -182,6 +203,8 @@ def run(source, root, learning=None, cache=None, *, progress=print):
             (staging / name).write_text(json.dumps(data, ensure_ascii=False, allow_nan=False, indent=2), encoding="utf-8")
         with (staging / "comparisons.jsonl").open("w", encoding="utf-8") as stream:
             for row in rows: stream.write(json.dumps(row, ensure_ascii=False, allow_nan=False)+"\n")
+        with (staging / "baseline_comparisons.jsonl").open("w", encoding="utf-8") as stream:
+            for row in baseline: stream.write(json.dumps(row, ensure_ascii=False, allow_nan=False)+"\n")
         (staging / "report.html").write_text(render_report(summary, list(finance.values()), rows), encoding="utf-8")
         (staging / "comparisons.html").write_text(render_report(summary, list(finance.values()), rows, all_rows=True), encoding="utf-8")
         os.replace(staging, target)

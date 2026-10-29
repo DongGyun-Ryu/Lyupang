@@ -10,11 +10,11 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
          "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
-         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd")
+         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd", "report_context.py")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.12.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.13.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -22,7 +22,23 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 설명 금액과 재무 원문 대조 0.12.0
+        guide = """Lyupang 원문 문맥 근거 연결 0.13.0
+
+이번 단계:
+새 폴더의 CROSS_CHECK.cmd만 실행하세요. 같은 저장 자료를 읽고 새 보고서를 만듭니다.
+문장에 빠진 기간·연결/별도 기준을 같은 보고서의 명시적 근거로 제한해 연결합니다.
+문장에 연결과 별도가 함께 있으면 각 금액 앞의 기준을 나눠 읽습니다.
+회계기수만 적힌 경우 같은 회사 원문에 명시된 기수-연도 쌍을 인용합니다.
+기준이 섞이거나 다른 회사·장·전망·참고 문맥이면 근거를 가져오지 않습니다.
+문맥 근거의 문단·문자 위치·해시와 원문 링크를 남깁니다.
+보고서의 '대조 요약'과 '문맥 근거 연결' 부분을 알려주세요.
+문장만으로 대조한 결과와 문맥을 포함한 결과를 같은 수치에서 나란히 보관합니다.
+대조 건수가 늘어도 정확도 향상·독립 검증·학습 승인을 뜻하지 않습니다.
+추가 키 입력·설치·재수집·FACTS/학습 재실행 없이 사용합니다.
+기존 보고서·모델·관찰 예측을 유지하고 실제 주문은 실행하지 않습니다.
+실제 재무 대조 건수는 PC에서 실행한 뒤 확인합니다.
+
+이전 0.12.0 재무 원문 대조 안내:
 
 이번 단계:
 새 폴더의 CROSS_CHECK.cmd만 실행하세요.

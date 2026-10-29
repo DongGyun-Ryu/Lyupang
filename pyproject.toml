@@ -1,7 +1,7 @@
 [project]
 name = "lyupang"
-version = "0.12.0"
-description = "사업보고서 설명 금액과 같은 접수번호의 저장 재무 원문 대조"
+version = "0.13.0"
+description = "원문 문맥의 기간·연결별도 근거를 인용한 재무 금액 대조"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 
