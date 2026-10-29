@@ -37,6 +37,7 @@ METRIC_NAMES = {"revenue": "매출", "operating_revenue": "영업수익", "gross
     "investment": "투자", "research_cost": "연구개발비", "operating_cost": "영업비용", "selling_cost": "판매관리비",
     "material_cost": "원재료비", "labor_cost": "인건비"}
 BINDING_NOTES = {"metric_unit_mismatch": "단위와 항목이 맞지 않아 연결 보류",
+    "metric_in_causal_context": "배경 설명의 항목일 수 있어 연결 보류",
     "different_quantity_role": "중간에 다른 수치 대상이 있어 연결 보류",
     "multiple_metrics_in_clause": "여러 항목이 있어 연결 보류",
     "percent_relation_unclear": "비율의 뜻이 불명확해 연결 보류"}

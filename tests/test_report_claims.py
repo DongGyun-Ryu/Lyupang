@@ -67,6 +67,16 @@ class MeasurementTests(unittest.TestCase):
 
 
 class ClaimTests(unittest.TestCase):
+    def test_causal_background_metric_is_not_assigned_partner_cost_growth(self):
+        text = "영업비용을 항목별로 나누어보면, 개발/운영비는 신규 채용에 따른 인원 증가 등으로 8.7% 상승하였고, 파트너비의 경우, 매출 증가의 영향 등으로 전년 대비 10.8% 상승하였습니다."
+        result = rc.structure_sentence(text, [], "NAVER")
+        quantity = result["measurements"][-1]
+        self.assertEqual(quantity["normalized_value"], "10.8")
+        self.assertIsNone(quantity["metric"])
+        self.assertEqual(quantity["metric_binding"], "metric_in_causal_context")
+        for blocker in quantity["binding_blockers"]:
+            self.assertEqual(text[blocker["start"]:blocker["end"]], blocker["text"])
+
     def test_actual_report_patent_counts_are_not_investment_amounts(self):
         text = "2025년 중 총 38조원의 R&D투자를 통해 국내 특허 10,639건, 미국 특허 10,347건 등을 등록하였습니다."
         result = rc.structure_sentence(text, ["II. 사업의 내용"], "삼성전자")

@@ -158,6 +158,11 @@ def bind_measurements(text, values, metrics):
             blockers = list(BINDING_BLOCKER.finditer(text, anchors[-1]["end"], row["start"]))
             if blockers:
                 row.update(metric=None, metric_binding="different_quantity_role", binding_blockers=[span(m) for m in blockers])
+            causal = list(re.finditer(r"영향(?:\s*등)?(?:으)?로|기인(?:하여|해)|때문에", text[anchors[-1]["end"]:row["start"]]))
+            if causal:
+                offset = anchors[-1]["end"]
+                row.update(metric=None, metric_binding="metric_in_causal_context",
+                    binding_blockers=[{"start": offset+m.start(), "end": offset+m.end(), "text": m.group()} for m in causal])
         elif len(candidates) > 1:
             row["metric_binding"] = "multiple_metrics_in_clause"
         elif (previous and previous["metric"] and row["unit"] in {"percent", "percentage_points"}
