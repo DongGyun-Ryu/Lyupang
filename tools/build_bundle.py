@@ -9,11 +9,12 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
-         "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd")
+         "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
+         "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.10.1.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.11.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -21,7 +22,22 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 사업 설명의 근거와 수치 0.10.1
+        guide = """Lyupang 수치와 항목의 검증 0.11.0
+
+이번 단계:
+새 폴더의 FACT_CHECK.cmd만 실행하세요. 저장된 최신 FACTS 결과 전체를 읽습니다.
+추가 설치·키 입력·재수집·FACTS 재실행 없이 검증 보고서를 엽니다.
+문장·수치의 원문 위치와 해시·공개 시점·저장 집계를 확인합니다.
+별도로 AI가 원문을 읽고 작성한 개발 기준 12사례와 숫자·항목 연결을 대조합니다.
+PDF에서 빠졌던 특허 건수도 이번 보고서에는 생략 없이 표시합니다.
+'검증 요약'과 '불일치' 사례를 알려주세요. 전체 문장을 직접 검토하실 필요는 없습니다.
+불일치·자료 없음은 확인할 결과이며 자동으로 통과 처리하지 않습니다.
+기존 원문 14건의 개발용 실행에서 11사례 부합·1사례 불일치가 확인됐습니다.
+현금유출의 (-) 부호와 항목 연결에 남은 문제가 드러났습니다. 이 수치를 모델 입력에 넣지 않습니다.
+AI가 만든 소수의 개발 기준이며 독립된 사람이 확인한 정답이나 새로운 문서의 정확도 평가가 아닙니다.
+모든 사례가 부합해도 학습 사용·모델 채택을 승인하지 않습니다.
+기존 모델·예측 6개 등 관찰 기록을 유지합니다. 재학습·실제 주문은 실행하지 않습니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\fact_checks의 새 폴더에 저장합니다.
 
 사용자 보고서에서 확인한 항목 연결 보완:
 특허 건수를 투자 금액에 연결하지 않으며, 시설투자에 따른 자산 증가액도 투자액으로 확정하지 않습니다.

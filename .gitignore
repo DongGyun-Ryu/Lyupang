@@ -16,5 +16,6 @@ context/
 text_validation/
 text_learning/
 facts/
+fact_checks/
 .env
 *.log

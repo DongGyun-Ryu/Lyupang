@@ -1,0 +1,318 @@
+{
+  "schema_version": 1,
+  "reference_version": "source_reviewed_development_cases_v1",
+  "authorship": "assistant_source_review",
+  "independent_human_reviewed": false,
+  "fresh_unseen_evaluation": false,
+  "selection": "handpicked_development_cases_including_known_errors",
+  "cases": [
+    {
+      "id": "samsung-2023",
+      "title": "매출 금액과 감소율",
+      "code": "005930",
+      "receipt_no": "20240312000736",
+      "block_id": "b000097",
+      "quote_sha256": "c8ce618e4589dd899799b76dbb78f3ef2b4dcbabd47c74ae28bf58b9cee3df9b",
+      "source_blocks_sha256": "8c1bf5f066405fb2ad23e4d41e40592319f75fa7e52ddbc834afb673a72d88b5",
+      "quantities": [
+        {
+          "text": "258조 9,355억원",
+          "normalized_value": "258935500000000",
+          "unit": "KRW",
+          "metric_equals": "revenue"
+        },
+        {
+          "text": "14.3%",
+          "normalized_value": "14.3",
+          "unit": "percent",
+          "metric_equals": "revenue"
+        }
+      ],
+      "context": {
+        "scope": "company",
+        "time_orientation": "reported"
+      },
+      "rationale": "14.3%는 감소 방향 표현과 함께 보관하며 금액으로 취급하지 않습니다."
+    },
+    {
+      "id": "samsung-2024",
+      "title": "매출 금액과 증가율",
+      "code": "005930",
+      "receipt_no": "20250311001085",
+      "block_id": "b000103",
+      "quote_sha256": "942f4c1d7d43f3e6207a7c6bcdac60a373676e2e1822c83779a7116385045d77",
+      "source_blocks_sha256": "3c4156552719703f5b0ca79c9d623f1414c691884c5f6af1d968f4bfbec1d530",
+      "quantities": [
+        {
+          "text": "300조 8,709억원",
+          "normalized_value": "300870900000000",
+          "unit": "KRW",
+          "metric_equals": "revenue"
+        },
+        {
+          "text": "16.2%",
+          "normalized_value": "16.2",
+          "unit": "percent",
+          "metric_equals": "revenue"
+        }
+      ],
+      "context": {
+        "scope": "company",
+        "time_orientation": "reported"
+      },
+      "rationale": "회사 전체 매출과 그 변화율의 후보 연결을 점검합니다."
+    },
+    {
+      "id": "samsung-2025",
+      "title": "복합 금액 단위",
+      "code": "005930",
+      "receipt_no": "20260310002820",
+      "block_id": "b000118",
+      "quote_sha256": "64b82f61972657a27005ed1575e7a8758f24d471c3abf8a461d60f1c3a9e5df0",
+      "source_blocks_sha256": "5a0e3fcaca70fa7b7212bb558dbf26238bd7af6288886207782712a3f3fac62f",
+      "quantities": [
+        {
+          "text": "333조 6,059억원",
+          "normalized_value": "333605900000000",
+          "unit": "KRW",
+          "metric_equals": "revenue"
+        },
+        {
+          "text": "10.9%",
+          "normalized_value": "10.9",
+          "unit": "percent",
+          "metric_equals": "revenue"
+        }
+      ],
+      "context": {
+        "scope": "company",
+        "time_orientation": "reported"
+      },
+      "rationale": "원문 단위를 원으로 정리한 값이며 회사 주장의 외부 사실 검증은 아닙니다."
+    },
+    {
+      "id": "patent-counts",
+      "title": "특허 건수와 투자 금액 구분",
+      "code": "005930",
+      "receipt_no": "20260310002820",
+      "block_id": "b000258",
+      "quote_sha256": "2c0f15d6cca990d5b002fbef9fb08972e3212a2990209f439aaf4609a667a8d1",
+      "source_blocks_sha256": "5a0e3fcaca70fa7b7212bb558dbf26238bd7af6288886207782712a3f3fac62f",
+      "quantities": [
+        {
+          "text": "38조원",
+          "normalized_value": "38000000000000",
+          "unit": "KRW"
+        },
+        {
+          "text": "10,639건",
+          "normalized_value": "10639",
+          "unit": "건",
+          "metric_forbidden": [
+            "investment"
+          ]
+        },
+        {
+          "text": "10,347건",
+          "normalized_value": "10347",
+          "unit": "건",
+          "metric_forbidden": [
+            "investment"
+          ]
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "등록한 특허 건수는 투자 금액이 아닙니다. 투자 금액 38조원과 별도입니다."
+    },
+    {
+      "id": "asset-increase",
+      "title": "투자와 자산 증가액 구분",
+      "code": "005930",
+      "receipt_no": "20260310002820",
+      "block_id": "b001426",
+      "quote_sha256": "1b58ce34f643b58c39526243a6f032e15b23045e93548d5e239bb7da93c821ec",
+      "source_blocks_sha256": "5a0e3fcaca70fa7b7212bb558dbf26238bd7af6288886207782712a3f3fac62f",
+      "quantities": [
+        {
+          "text": "9조 3,596억원",
+          "normalized_value": "9359600000000",
+          "unit": "KRW",
+          "metric_forbidden": [
+            "investment"
+          ]
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "시설투자에 따른 유형자산 증가액을 시설투자 지출액으로 확정하지 않습니다."
+    },
+    {
+      "id": "research-netting",
+      "title": "연구개발비 총액과 비용 처리액",
+      "code": "005930",
+      "receipt_no": "20260310002820",
+      "block_id": "b000244",
+      "quote_sha256": "e48ddadc271d2cc02442b25ead799a5170e140965a76ebfee1aba3ab398e8d2e",
+      "source_blocks_sha256": "5a0e3fcaca70fa7b7212bb558dbf26238bd7af6288886207782712a3f3fac62f",
+      "quantities": [
+        {
+          "text": "37조 7,548억원",
+          "normalized_value": "37754800000000",
+          "unit": "KRW"
+        },
+        {
+          "text": "37조 7,404억원",
+          "normalized_value": "37740400000000",
+          "unit": "KRW"
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "두 금액의 역할이 다릅니다. 단일 연구개발비 값으로 승인하면 안 됩니다."
+    },
+    {
+      "id": "naver-reported",
+      "title": "영업수익과 영업이익 구분",
+      "code": "035420",
+      "receipt_no": "20260313001021",
+      "block_id": "b001969",
+      "quote_sha256": "f555e912421595e19622ac9535750c5390b5268dbc0e63df9b1c45c5a6055f0f",
+      "source_blocks_sha256": "68ff7ccfff6e75f427f7277d85a2b1b907887364b10532ef2aa4bb04b29f905e",
+      "quantities": [
+        {
+          "text": "12조원",
+          "normalized_value": "12000000000000",
+          "unit": "KRW",
+          "metric_equals": "operating_revenue"
+        },
+        {
+          "text": "2.2조원",
+          "normalized_value": "2200000000000",
+          "unit": "KRW",
+          "metric_equals": "operating_profit"
+        }
+      ],
+      "context": {
+        "scope": "company",
+        "time_orientation": "reported"
+      },
+      "rationale": "이 문장에 적힌 반올림 금액 기준입니다. 다른 문장의 더 정밀한 금액과 같다고 보증하지 않습니다."
+    },
+    {
+      "id": "cost-background",
+      "title": "비용 상승과 배경 매출 구분",
+      "code": "035420",
+      "receipt_no": "20260313001021",
+      "block_id": "b001975",
+      "quote_sha256": "e5d8b99dc9601097e52687f4347b58766a843fb349101de6f8817f2adb7716db",
+      "source_blocks_sha256": "68ff7ccfff6e75f427f7277d85a2b1b907887364b10532ef2aa4bb04b29f905e",
+      "quantities": [
+        {
+          "text": "10.8%",
+          "normalized_value": "10.8",
+          "unit": "percent",
+          "metric_forbidden": [
+            "revenue"
+          ]
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "10.8%는 파트너비 상승률이며 배경으로 나온 매출 증가율로 연결하면 안 됩니다."
+    },
+    {
+      "id": "cash-outflow",
+      "title": "현금흐름과 명시적 음수 표현",
+      "code": "035420",
+      "receipt_no": "20260313001021",
+      "block_id": "b001997",
+      "quote_sha256": "d19b10bad30648f99cdf6627b48769f32b4503311d0434efc43b2f2cb93c6e55",
+      "source_blocks_sha256": "68ff7ccfff6e75f427f7277d85a2b1b907887364b10532ef2aa4bb04b29f905e",
+      "quantities": [
+        {
+          "text": "44.5%",
+          "normalized_value": "44.5",
+          "unit": "percent",
+          "metric_forbidden": [
+            "investment"
+          ]
+        },
+        {
+          "text": "7,437억 원",
+          "normalized_value": "-743700000000",
+          "unit": "KRW"
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "투자활동 현금유출 감소율은 투자 지출액 자체의 증감으로 확정하지 않습니다. 원문의 (-)는 명시적 음수 표기입니다. 이 개발 기준은 현재 규칙과 다를 수 있습니다."
+    },
+    {
+      "id": "missing-unit",
+      "title": "통화 없는 금액 보류",
+      "code": "005380",
+      "receipt_no": "20260318001394",
+      "block_id": "b000253",
+      "quote_sha256": "f104ba50042f6e9daea92811d6860e9633b5cb9efbfb7798fde551cc79e2ec30",
+      "source_blocks_sha256": "ced4b92e7ada2cffebcdbc79b731e679d62076c6fd9f75b446b77b1630177dfc",
+      "quantities": [
+        {
+          "text": "186조",
+          "normalized_value": null,
+          "unit": null
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "이 문장에는 통화 단위가 명시되지 않았으므로 원 단위를 추정하지 않습니다."
+    },
+    {
+      "id": "segment-sales",
+      "title": "다른 사업 범위의 매출",
+      "code": "005380",
+      "receipt_no": "20260318001394",
+      "block_id": "b000133",
+      "quote_sha256": "deda8b4468ea62240ab91ce978a5d5c4f00dff4587c032e4ec7bd2e09c1b598d",
+      "source_blocks_sha256": "ced4b92e7ada2cffebcdbc79b731e679d62076c6fd9f75b446b77b1630177dfc",
+      "quantities": [
+        {
+          "text": "5조 8,390억원",
+          "normalized_value": "5839000000000",
+          "unit": "KRW"
+        }
+      ],
+      "context": {
+        "scope": "related_or_segment",
+        "status": "needs_review"
+      },
+      "rationale": "디펜스·레일 등의 부문 설명입니다. 현대자동차 전체 매출로 승인하면 안 됩니다."
+    },
+    {
+      "id": "range-cost",
+      "title": "범위를 단일 값으로 만들지 않기",
+      "code": "035420",
+      "receipt_no": "20260313001021",
+      "block_id": "b000343",
+      "quote_sha256": "fc2c4dded95a81e4a0ff32bda5f832ff55efc87ecb9948e0319369f416b21876",
+      "source_blocks_sha256": "68ff7ccfff6e75f427f7277d85a2b1b907887364b10532ef2aa4bb04b29f905e",
+      "quantities": [
+        {
+          "text": "100~500원",
+          "normalized_value": null,
+          "unit": "KRW"
+        }
+      ],
+      "context": {
+        "status": "needs_review"
+      },
+      "rationale": "100~500원은 범위이며 100원 또는 500원 하나로 확정하지 않습니다."
+    }
+  ]
+}
