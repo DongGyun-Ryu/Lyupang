@@ -8,11 +8,12 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "dart_client.py", "setup_dart.py", "RESEARCH.cmd", "DART_SETUP.cmd", "train.py", "financial_history.py",
          "learning.py", "TRAIN.cmd", "review.py", "REVIEW.cmd", "observe.py", "OBSERVE.cmd",
          "business.py", "business_text.py", "BUSINESS.cmd", "evidence_context.py", "contextualize.py", "CONTEXT.cmd",
-         "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd")
+         "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
+         "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.8.2.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.9.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -20,7 +21,21 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 관찰 프로그램 Windows 출력 보완 0.8.2
+        guide = """Lyupang 설명 추가 모델 연구 0.9.0
+
+분석·학습 기능 확장:
+새 폴더의 LEARN_TEXT.cmd를 실행하세요.
+관찰 중인 고정 모델의 원래 학습 자료와 기존 BUSINESS 사업보고서를 읽습니다.
+같은 사례에서 가격·재무 모델과 사업 설명의 글자 조각을 더한 모델을 각각 학습해 비교합니다.
+이미 저장된 자료를 쓰므로 인증키 입력·재수집·추가 설치는 필요하지 않습니다.
+현재 OBSERVE 창과 예측 6개 등 기존 기록은 바꾸지 않습니다. 같이 실행해도 모델을 교체하지 않습니다.
+보고서의 '같은 사례에서의 비교'와 '원문이 반복되는 범위'를 확인해주세요.
+수치 모델이나 과거 평균 기준보다 오차가 크거나 같으면 탈락, 줄어도 새 자료 검증 전에는 보류합니다.
+이미 확인한 과거 자료의 개발용 비교입니다. 새로운 미사용 성능 평가가 아닙니다.
+글의 표현과 미래 가격 사이의 통계 관계를 학습하며 뜻을 정확히 이해하거나 원인을 입증하지 않습니다.
+원문 수·기간별 사례가 부족하면 학습 대기 이유를 표시합니다. 같은 연간 보고서는 여러 날짜에 반복됩니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\text_learning에 새 폴더로 저장합니다.
+실제 주문·모델 자동 채택·뉴스 수집·비용을 반영한 매매 검증은 수행하지 않습니다.
 
 OBSERVE 실행 중 _readerthread / UnicodeDecodeError가 표시된 경우:
 윈도우 권한 확인 도구의 한글 출력과 파이썬 UTF-8 설정이 맞지 않던 부분을 보완했습니다.

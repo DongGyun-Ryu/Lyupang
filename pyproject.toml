@@ -1,7 +1,7 @@
 [project]
 name = "lyupang"
-version = "0.8.2"
-description = "사업보고서 문장 직접 검토와 고정 분류 비교"
+version = "0.9.0"
+description = "사업보고서 설명을 추가한 연구 모델 학습과 수치 모델 비교"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 
