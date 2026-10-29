@@ -19,5 +19,6 @@ facts/
 fact_checks/
 financial_crosschecks/
 evidence_tables/
+finance_learning/
 .env
 *.log

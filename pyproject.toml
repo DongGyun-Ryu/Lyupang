@@ -1,7 +1,7 @@
 [project]
 name = "lyupang"
-version = "0.14.0"
-description = "재현 확인한 설명·재무 근거 자료표와 공개 시점별 후보 항목 정리"
+version = "0.15.0"
+description = "같은 접수번호 재무 원문 보완과 영업이익률 추가 모델의 연구용 비교"
 requires-python = ">=3.13,<3.14"
 dependencies = ["kwcli==1.0.3", "numpy==2.5.4"]
 

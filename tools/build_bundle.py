@@ -11,11 +11,11 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
          "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
          "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd", "report_context.py",
-         "evidence_table.py", "EVIDENCE.cmd")
+         "evidence_table.py", "EVIDENCE.cmd", "finance_learning.py", "learn_finance.py", "LEARN_FINANCE.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.14.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.15.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -23,7 +23,25 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 회사별 근거 자료표 0.14.0
+        guide = """Lyupang 근거 재무 추가 연구 0.15.0
+
+이번 단계:
+새 폴더의 LEARN_FINANCE.cmd만 실행하세요.
+저장된 CROSS_CHECK 원문·대조와 기존 학습 자료를 확인합니다.
+같은 접수번호의 재무 원문에서 직접 읽은 금액은 설명 대조 금액과 구분해 보관합니다.
+매출·영업이익·순이익의 확인 가능한 항목을 정리합니다. 없는 값은 비워둡니다.
+영업이익률과 그 전년 대비 변화를 추가한 별도 연구 모델을 학습·비교합니다.
+과거 각 날짜까지 공개된 같은 접수번호·연결/별도 기준을 맞춰 연결합니다.
+전년 금액은 선택한 동일 제출본의 비교 전기 항목만 사용합니다.
+두 모델은 같은 사례·기간에서 비교합니다. 이미 본 과거 자료의 개발용 비교입니다.
+기준보다 나쁘면 탈락, 좋아도 새 자료 검증 전에는 보류합니다.
+보고서의 '자료 보완'과 '같은 사례에서의 비교'를 알려주세요.
+추가 설치·인증키 입력·재수집·CROSS_CHECK/EVIDENCE 재실행은 필요 없습니다.
+기존 OBSERVE 창·고정 모델·예측 기록과 이전 자료표는 유지합니다.
+실제 주문·모델 자동 채택·생산 학습 승인과 연결하지 않습니다.
+결과는 %LOCALAPPDATA%\\Lyupang\\finance_learning의 새 폴더에 저장합니다.
+
+이전 0.14.0 회사별 근거 자료표 안내:
 
 이번 단계:
 새 폴더의 EVIDENCE.cmd만 실행하세요. 최신 CROSS_CHECK 결과와 저장 원문을 다시 확인합니다.
