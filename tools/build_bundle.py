@@ -11,11 +11,12 @@ FILES = ("collect.py", "lyupang.py", "sdk_compat.py", "START.cmd", "OPEN_DATA.cm
          "text_validation.py", "textcheck.py", "text_review.html", "TEXT_CHECK.cmd",
          "text_learning.py", "learn_text.py", "LEARN_TEXT.cmd", "report_claims.py", "facts.py", "FACTS.cmd",
          "check_facts.py", "claim_audit_reference.json", "FACT_CHECK.cmd", "financial_crosscheck.py", "cross_check.py", "CROSS_CHECK.cmd", "report_context.py",
-         "evidence_table.py", "EVIDENCE.cmd", "finance_learning.py", "learn_finance.py", "LEARN_FINANCE.cmd")
+         "evidence_table.py", "EVIDENCE.cmd", "finance_learning.py", "learn_finance.py", "LEARN_FINANCE.cmd",
+         "observe_finance.py", "OBSERVE_FINANCE.cmd")
 
 
 def build():
-    target = ROOT / "dist" / "Lyupang-data-0.15.0.zip"
+    target = ROOT / "dist" / "Lyupang-data-0.16.0.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for name in FILES:
@@ -23,7 +24,26 @@ def build():
             if name.endswith(".cmd"):
                 payload = payload.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
             bundle.writestr("Lyupang-data/" + name, payload)
-        guide = """Lyupang 근거 재무 추가 연구 0.15.0
+        guide = """Lyupang 재무 추가 모델의 새 예측 관찰 0.16.0
+
+이번 단계:
+새 폴더의 OBSERVE_FINANCE.cmd만 실행하세요.
+기존 OBSERVE 검은 창은 그대로 켜두고, 이번 검은 창도 함께 켜두세요.
+처음에는 저장된 LEARN_FINANCE 연구 결과와 원문·평가 기록을 확인하고 모델을 고정합니다.
+수치 모델과 재무 추가 모델의 예측을 같은 종목·기준일·관찰 구간의 한 쌍으로 저장합니다.
+이후 실제 가격이 쌓이면 같은 가격 결과에서 두 모델을 함께 비교합니다.
+새 예측은 한국 시간 오전 9시 전에만 저장합니다. 이후 실행해 0쌍이어도 정상입니다.
+창과 PC가 켜져 있으면 매일 한국 시간 오전 8시 30분에 자동 확인합니다.
+컴퓨터가 꺼져 있거나 잠들어 놓친 날은 뒤늦게 채우지 않습니다.
+브라우저 보고서만 열어둬서는 자동 실행되지 않습니다.
+기존 키움·DART 인증정보를 재사용합니다. 키 재입력·LEARN_FINANCE/기존 TRAIN 재실행은 필요 없습니다.
+새 예측을 만들 때는 최신 가격·공시를 조회하고, 필요한 재무 원문을 같은 접수번호로 확인합니다.
+다시 실행해도 처음 고정한 모델을 유지합니다. 재학습·실제 주문·자동 모델 채택은 없습니다.
+보고서의 '기록 상태'와 실행 창의 오류 메시지가 있으면 알려주세요.
+결과는 %LOCALAPPDATA%\\Lyupang\\forward_finance\\experiment에 저장합니다.
+기존 forward/experiment 예측과 이번 예측을 합치지 않습니다.
+
+이전 0.15.0 근거 재무 추가 연구 안내:
 
 이번 단계:
 새 폴더의 LEARN_FINANCE.cmd만 실행하세요.
